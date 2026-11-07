@@ -1,6 +1,6 @@
 # SafeRadius
 
-SafeRadius 現在包含原生 SwiftUI iOS App 與原本的 HTML 互動版。
+以 SwiftUI 製作的 iOS 安全互助 App 原型。
 
 ## 開啟 iOS App
 
@@ -25,4 +25,4 @@ xcodebuild -project SafeRadius.xcodeproj -scheme SafeRadius \
 - 協助者可依序標記願意前往、開始前往、已抵達。
 - 掛斷語音後，求助者仍可繼續尋找協助或標記安全結束事件。
 
-所有通知、通話、距離、定位、導航與聊天都是本機展示模擬，不會連接真實服務或撥打緊急電話。`index.html` 保留原先可直接用瀏覽器開啟的版本。
+通知、通話、距離、定位、導航與聊天目前皆為本機展示模擬，不會連接真實服務或撥打緊急電話。
