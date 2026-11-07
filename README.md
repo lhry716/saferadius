@@ -1,6 +1,10 @@
 # SafeRadius
 
+[![Build iOS App](https://github.com/lhry716/saferadius/actions/workflows/ios.yml/badge.svg)](https://github.com/lhry716/saferadius/actions/workflows/ios.yml)
+
 以 SwiftUI 製作的 iOS 安全互助 App 原型。
+
+GitHub Actions：<https://github.com/lhry716/saferadius/actions>
 
 ## 開啟 iOS App
 
