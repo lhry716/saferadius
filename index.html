@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#F5F5F3">
+<meta name="robots" content="noindex">
+<meta name="description" content="SafeRadius 展示用原型。語音、配對與定位都是模擬，未連接任何真實服務。緊急情況請直接撥打 110 或 119。">
+<title>SafeRadius Demo</title>
+<style>
+/* 設計變數：拿到 SafeRadius V2 後，先對齊這一段 */
+:root{
+  --bg:#F8F8F6; --ink:#1E2529; --muted:#747B7E; --card:#FFFFFF; --line:#E8EAE9;
+  --sos:#E45450; --sos-soft:#FFF1ED; --call:#151A21; --call2:#29323B; --ok:#2D9D76;
+  --on-dark:#F4F5F7; --on-dark-muted:#A5B1BB;
+  --r-s:12px; --r-m:18px; --r-l:29px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --t-fast:150ms; --t-mid:240ms; --t-slow:320ms;
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+  --app-h:100dvh;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#E9E8E4;color:var(--ink);overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,textarea,input{font:inherit;color:inherit}
+button{background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid #2B6CB0;outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* 舞台 */
+.stage{height:var(--app-h);display:flex;align-items:center;justify-content:center;gap:24px;padding:16px}
+.phone{position:relative;width:390px;height:min(844px,calc(100dvh - 32px));background:var(--bg);overflow:hidden;overflow:clip;
+  border-radius:44px;box-shadow:0 0 0 9px #111316,0 24px 60px rgba(0,0,0,.22);container-type:size;
+  --safe-top:44px;--safe-bottom:26px;flex:none}
+.phone[data-off]{display:none}
+.statusbar{position:absolute;inset:0 0 auto 0;height:44px;z-index:70;display:flex;align-items:center;justify-content:space-between;
+  padding:6px 30px 0;font-size:14px;font-weight:600;pointer-events:none;color:var(--ink);transition:color var(--t-mid)}
+.phone[data-dark] .statusbar{color:var(--on-dark)}
+.statusbar .bars{display:flex;gap:3px;align-items:flex-end}
+.statusbar .bars i{display:block;width:3px;background:currentColor;border-radius:1px}
+.homebar{position:absolute;left:50%;bottom:8px;width:128px;height:5px;margin-left:-64px;border-radius:3px;background:var(--ink);opacity:.85;z-index:70;pointer-events:none;transition:background var(--t-mid)}
+.phone[data-dark] .homebar{background:#fff}
+
+@media (max-width:520px){
+  html,body{background:var(--bg)}
+  .stage{padding:0;gap:0;display:block}
+  .phone{width:100%;height:var(--app-h);border-radius:0;box-shadow:none;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+  .statusbar,.homebar{display:none}
+}
+
+/* 畫面切換 */
+/* 舊畫面留在下層不淡出，新畫面在上層淡入蓋過去，兩邊的文字才不會疊在一起 */
+.screen{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;background:var(--bg);opacity:0;visibility:hidden;
+  transform:translateY(8px);transition:opacity 0s linear var(--t-mid),transform 0s linear var(--t-mid),visibility 0s linear var(--t-mid)}
+.screen.active{z-index:2;opacity:1;visibility:visible;transform:none;transition:opacity var(--t-mid) ease,transform var(--t-mid) var(--ease)}
+.screen.dark{background:var(--call);color:var(--on-dark)}
+.demo-tag{display:inline-block;font-size:11px;line-height:16px;padding:0 6px;border-radius:6px;background:rgba(32,32,32,.07);color:var(--muted);white-space:nowrap}
+.dark .demo-tag{background:rgba(255,255,255,.09);color:var(--on-dark-muted)}
+
+/* 首頁 */
+.home{padding:calc(var(--safe-top) + 12px) 24px 0}
+.home-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.brand{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.tagline{font-size:13px;color:var(--muted);margin-top:2px}
+.avatar-btn{position:relative;width:44px;height:44px;border-radius:50%;flex:none}
+.avatar{display:flex;align-items:center;justify-content:center;border-radius:50%;background:#46505F;color:#fff;font-weight:600;width:100%;height:100%;font-size:16px;user-select:none}
+.avatar-btn .dot{position:absolute;right:0;bottom:0;width:13px;height:13px;border-radius:50%;background:var(--ok);border:2.5px solid var(--bg)}
+.avatar-btn .dot.off{background:#B9B9B4}
+.notify-line{font-size:12px;color:var(--muted);text-align:right;margin-top:4px;min-height:16px}
+.home-main{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:4px 0 8px;scrollbar-width:none}
+.home-main::-webkit-scrollbar{display:none}
+.home-main h1{font-size:clamp(24px,4cqh,28px);font-weight:700;letter-spacing:-.01em;margin-top:auto;text-align:center}
+.home-main .sub{font-size:15px;color:var(--muted);margin-top:4px;text-align:center}
+.sos-wrap{--size:clamp(168px,29cqh,224px);position:relative;width:calc(var(--size) + 40px);height:calc(var(--size) + 40px);flex:none;margin:clamp(8px,2cqh,20px) 0 0;display:flex;align-items:center;justify-content:center}
+.sos-halo{position:absolute;inset:0;border-radius:50%;background:var(--sos-soft);transition:transform var(--t-slow) var(--ease),opacity var(--t-slow)}
+.sos{position:relative;width:var(--size);height:var(--size);border-radius:50%;background:var(--sos);color:#fff;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  box-shadow:0 6px 18px rgba(216,61,56,.28);transition:transform var(--t-mid) var(--ease);display:flex;align-items:center;justify-content:center;flex-direction:column}
+.sos b{font-size:clamp(30px,4.8cqh,38px);font-weight:700;letter-spacing:.04em;line-height:1.2}
+.sos-ring{position:absolute;inset:-14px;width:calc(100% + 28px);height:calc(100% + 28px);transform:rotate(-90deg);pointer-events:none}
+.sos-ring circle{fill:none;stroke-width:3.2}
+.sos-ring .prog{stroke:var(--sos);stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;opacity:0;transition:opacity var(--t-fast)}
+.phone.holding .sos{transform:scale(.97)}
+.phone.holding .sos-halo{transform:scale(1.02)}
+.phone.holding .sos-ring .prog{opacity:1}
+.phone.fired .sos{transform:scale(1.06)}
+.phone.fired .sos-halo{transform:scale(1.22);opacity:0}
+.hold-hint{font-size:13px;color:var(--muted);min-height:20px;margin-top:2px;text-align:center}
+.phone.holding .hold-hint{color:var(--sos);font-weight:500}
+.brief{width:100%;margin-top:8px;margin-bottom:auto;flex:none}
+.brief-box{position:relative;background:var(--card);border-radius:var(--r-m);border:1px solid var(--line);padding:12px 16px;transition:border-color var(--t-fast)}
+.brief-box:focus-within{border-color:#BDBDB7}
+.brief textarea{display:block;width:100%;border:0;outline:0;background:none;resize:none;font-size:16px;line-height:22px;padding:0;max-height:88px}
+.brief textarea::placeholder{color:#8C8C88}
+.brief .count{font-size:11px;color:var(--muted);text-align:right;margin-top:2px}
+.a11y-link{display:block;margin:8px auto 0;font-size:12px;color:var(--muted);min-height:32px;padding:6px 8px;text-decoration:underline;text-underline-offset:2px}
+.a11y-link.armed{color:var(--sos);font-weight:600}
+.home-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 calc(var(--safe-bottom) + 12px);border-top:1px solid var(--line)}
+.loc-state{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);min-width:0}
+.loc-state i{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.loc-state i.off{background:#B9B9B4}
+.emg{display:flex;gap:8px;flex:none}
+.emg button{min-width:56px;height:40px;border-radius:20px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:600;padding:0 12px;transition:transform var(--t-fast)}
+.emg button:active{transform:scale(.96)}
+.emg button span{font-weight:400;font-size:11px;color:var(--muted);margin-left:3px}
+.dark .emg button{background:var(--call2);border-color:transparent;color:var(--on-dark)}
+.dark .emg button span{color:var(--on-dark-muted)}
+
+/* 等待 */
+.searching{padding:calc(var(--safe-top) + 12px) 24px calc(var(--safe-bottom) + 16px);align-items:center;text-align:center}
+.top-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.top-row .brand{font-size:16px;font-weight:600}
+.pulse{position:relative;width:176px;height:176px;margin:clamp(12px,5cqh,40px) 0 clamp(8px,3cqh,24px);display:flex;align-items:center;justify-content:center;flex:none}
+.pulse i{position:absolute;inset:0;border-radius:50%;background:var(--sos-soft);animation:wave 2.8s ease-out infinite}
+.pulse i:nth-child(2){animation-delay:.93s}.pulse i:nth-child(3){animation-delay:1.86s}
+.pulse b{position:relative;width:76px;height:76px;border-radius:50%;background:var(--sos);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+@keyframes wave{0%{transform:scale(.42);opacity:.95}100%{transform:scale(1);opacity:0}}
+.searching h2{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.searching .sub{font-size:15px;color:var(--muted);margin-top:6px;line-height:22px}
+.search-status{font-size:13px;color:var(--ink);margin-top:12px;min-height:40px;line-height:20px}
+.sent{width:100%;background:var(--card);border-radius:var(--r-m);padding:12px 16px;text-align:left;margin-top:auto}
+.sent small{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+.sent p{font-size:15px;line-height:22px;overflow-wrap:anywhere;max-height:88px;overflow:auto}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:26px;font-size:16px;font-weight:600;padding:8px 16px;transition:transform var(--t-fast),background var(--t-fast),opacity var(--t-fast);text-align:center}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.5}
+.btn.line{border:1px solid #CFCEC9;background:var(--card)}
+.btn.solid{background:var(--ink);color:#fff}
+.btn.danger{background:var(--sos);color:#fff}
+.btn.ok{background:var(--ok);color:#fff}
+.btn.quiet{background:var(--call2);color:var(--on-dark)}
+.btn.ghost{background:none;font-weight:500;min-height:44px}
+.dark .btn.ghost{color:var(--on-dark-muted)}
+.search-actions{width:100%;display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.search-actions .emg{justify-content:center}
+
+/* 來電 */
+.incoming{padding:calc(var(--safe-top) + 16px) 24px calc(var(--safe-bottom) + 24px);align-items:center;text-align:center}
+.incoming .eyebrow{font-size:15px;font-weight:600;margin-top:clamp(4px,3cqh,24px)}
+.big-avatar{position:relative;width:96px;height:96px;margin:clamp(12px,3.5cqh,28px) 0 12px;flex:none}
+.big-avatar .avatar{font-size:34px;background:#3A4250}
+.incoming .ring-a{position:absolute;inset:-12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);animation:softring 2s ease-out infinite}
+@keyframes softring{0%{transform:scale(.92);opacity:.9}100%{transform:scale(1.2);opacity:0}}
+.incoming h2{font-size:28px;font-weight:600}
+.approx{display:flex;align-items:center;justify-content:center;gap:4px;font-size:13px;color:var(--on-dark-muted);margin-top:6px}
+.approx .i{width:16px;height:16px}
+.inc-brief{width:100%;background:var(--call2);border-radius:var(--r-m);padding:12px 16px;margin-top:clamp(12px,3cqh,24px);text-align:left;max-height:30cqh;overflow:auto}
+.inc-brief small{display:block;font-size:12px;color:var(--on-dark-muted);margin-bottom:4px}
+.inc-brief p{font-size:16px;line-height:24px;overflow-wrap:anywhere}
+.persona-note{font-size:12px;color:var(--on-dark-muted);margin-top:8px;min-height:16px}
+.inc-actions{margin-top:auto;display:flex;justify-content:space-around;width:100%;padding-top:12px}
+.round-col{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;min-width:96px}
+.round{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;transition:transform var(--t-fast)}
+.round-col:active .round{transform:scale(.94)}
+.round.skip{background:#4A505C}
+.round.yes{background:var(--ok)}
+.round .i{width:30px;height:30px}
+
+/* 配對成功 */
+.connecting{align-items:center;justify-content:center;text-align:center;padding:24px}
+.tick{width:88px;height:88px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;color:#fff;animation:pop var(--t-slow) var(--ease)}
+.tick .i{width:42px;height:42px;stroke-width:2.2}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+.connecting h2{font-size:22px;font-weight:600;margin-top:20px}
+.connecting p{font-size:14px;color:var(--on-dark-muted);margin-top:6px}
+
+/* 通話 */
+.call{padding:calc(var(--safe-top) + 8px) 20px calc(var(--safe-bottom) + 12px)}
+.call-head{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px}
+.call-head .l{min-width:0}
+.call-head .brand{font-size:14px;font-weight:600}
+.conn{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--on-dark-muted);margin-top:1px;white-space:nowrap}
+.conn i{width:6px;height:6px;border-radius:50%;background:#4CC38A}
+.call.ended .conn i{background:#7A808C}
+.chip110{height:32px;padding:0 12px;border-radius:16px;background:var(--call2);font-size:13px;font-weight:600;position:relative}
+.chip110::after{content:"";position:absolute;inset:-6px}
+.call-mid{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;text-align:center;scrollbar-width:none}
+.call-mid::-webkit-scrollbar{display:none}
+.call-mid .big-avatar{width:clamp(72px,12cqh,104px);height:clamp(72px,12cqh,104px);margin:clamp(4px,2cqh,20px) 0 10px}
+.voice{position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(76,195,138,.5);animation:softring 2.4s ease-out infinite}
+.call.ended .voice{display:none}
+.call h2{font-size:24px;font-weight:600;overflow-wrap:anywhere}
+.timer{font-size:15px;color:var(--on-dark-muted);font-variant-numeric:tabular-nums;margin-top:2px}
+.help-status{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:500;margin-top:8px;padding:5px 12px;border-radius:14px;background:var(--call2);transition:background var(--t-mid),color var(--t-mid)}
+.help-status.go{background:rgba(32,139,83,.22);color:#6EDBA4}
+.help-status.end{background:rgba(255,255,255,.07);color:var(--on-dark-muted)}
+.call-brief{width:100%;background:var(--call2);border-radius:var(--r-s);padding:8px 12px;margin-top:clamp(8px,2cqh,16px);text-align:left;font-size:14px;line-height:20px;overflow-wrap:anywhere;flex:none}
+.call-brief small{font-size:11px;color:var(--on-dark-muted);display:block}
+.call-brief p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.call-brief.open p{display:block}
+.call-tools{display:flex;flex-direction:column;gap:8px;padding-top:12px}
+.tool-row{display:flex;gap:8px}
+.tool-row .btn{min-height:48px;font-size:15px;border-radius:24px;flex:1;min-width:0}
+.go-hint{font-size:12px;color:var(--on-dark-muted);text-align:center;min-height:0}
+.loc-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:#6EDBA4;padding:0 4px;min-height:32px}
+.loc-line button{font-size:13px;color:var(--on-dark-muted);text-decoration:underline;text-underline-offset:2px;min-height:32px;padding:0 4px;white-space:nowrap}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding-top:12px}
+.ctl{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--on-dark-muted);min-height:44px;position:relative}
+.ctl .disc{width:56px;height:56px;border-radius:50%;background:var(--call2);color:var(--on-dark);display:flex;align-items:center;justify-content:center;transition:background var(--t-fast),color var(--t-fast),transform var(--t-fast)}
+.ctl:active:not(:disabled) .disc{transform:scale(.93)}
+.ctl[aria-pressed="true"] .disc{background:var(--on-dark);color:var(--call)}
+.ctl.hang .disc{background:var(--sos);color:#fff}
+.ctl:disabled{opacity:.45}
+.badge{position:absolute;top:-2px;left:50%;margin-left:12px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--sos);color:#fff;font-size:12px;font-weight:600;line-height:20px;text-align:center}
+.mini-call{display:flex;align-items:center;gap:8px;padding:0 16px 10px;border-bottom:1px solid var(--line)}
+.mini-call .who{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-call .who span{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;margin-left:6px}
+.mini-btn{width:40px;height:40px;border-radius:50%;background:#EFEEEA;display:flex;align-items:center;justify-content:center;flex:none;transition:background var(--t-fast)}
+.mini-btn .i{width:20px;height:20px}
+.mini-btn[aria-pressed="true"]{background:var(--ink);color:#fff}
+.mini-btn.hang{background:var(--sos);color:#fff}
+
+/* 協助者掛斷後、結束畫面 */
+.after{padding:calc(var(--safe-top) + 24px) 24px calc(var(--safe-bottom) + 20px);text-align:center;align-items:center;overflow:auto}
+.after h2{font-size:24px;font-weight:700;margin-top:16px}
+.after .sub{font-size:15px;line-height:22px;margin-top:8px;color:var(--muted)}
+.after.dark .sub{color:var(--on-dark-muted)}
+.after .acts{width:100%;margin-top:auto;display:flex;flex-direction:column;gap:12px;padding-top:16px}
+.after .ask{width:100%;background:var(--call2);border-radius:var(--r-m);padding:16px;text-align:left;font-size:15px;line-height:22px;margin-top:20px}
+.after .ask b{display:block;margin-bottom:2px}
+.sum{width:100%;margin-top:24px;background:var(--card);border-radius:var(--r-m);padding:4px 16px;text-align:left}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-size:14px;border-bottom:1px solid var(--line)}
+.sum div:last-child{border:0}
+.sum div span:first-child{color:var(--muted)}
+.tick.soft{background:var(--ok);margin-top:clamp(12px,6cqh,56px)}
+.ic-dim{width:72px;height:72px;border-radius:50%;background:var(--call2);display:flex;align-items:center;justify-content:center;margin-top:clamp(8px,4cqh,32px);flex:none}
+
+/* 底部抽屜 */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.38);opacity:0;visibility:hidden;z-index:30;transition:opacity var(--t-mid),visibility 0s linear var(--t-mid)}
+.scrim.on{opacity:1;visibility:visible;transition:opacity var(--t-mid)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);color:var(--ink);border-radius:var(--r-l) var(--r-l) 0 0;z-index:40;display:flex;flex-direction:column;
+  transform:translateY(102%);visibility:hidden;transition:transform var(--t-slow) var(--ease),visibility 0s linear var(--t-slow);max-height:calc(100% - var(--safe-top) - 8px)}
+.sheet.open{transform:none;visibility:visible;transition:transform var(--t-slow) var(--ease)}
+.sheet.dragging{transition:none}
+.sheet[data-sheet="info"],.sheet[data-sheet="emergency"]{z-index:55}
+.scrim.over{z-index:52}
+.sheet.full{top:calc(var(--safe-top) + 60px);max-height:none}
+.grip{flex:none;display:block;width:100%;height:24px;position:relative;touch-action:none;cursor:grab}
+.grip::after{content:"";position:absolute;left:50%;top:9px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:#D5D4CF}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px 8px}
+.sheet-head h3{font-size:17px;font-weight:600}
+.x{width:40px;height:40px;border-radius:50%;background:#EFEEEA;display:flex;align-items:center;justify-content:center;flex:none}
+.x .i{width:20px;height:20px}
+.sheet-body{padding:0 20px calc(var(--safe-bottom) + 16px);overflow:auto}
+.sheet-body p{font-size:15px;line-height:23px}
+.sheet-body p+p{margin-top:10px}
+.sheet-body .muted{color:var(--muted);font-size:13px;line-height:20px}
+.stack{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.opt{display:block;width:100%;text-align:left;border-radius:var(--r-m);padding:14px 16px;border:1px solid var(--line);transition:transform var(--t-fast)}
+.opt:active{transform:scale(.985)}
+.opt b{display:block;font-size:16px;font-weight:600}
+.opt span{display:block;font-size:13px;line-height:19px;color:var(--muted);margin-top:2px}
+.opt.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.opt.primary span{color:#C9C9C9}
+.opt.safe b{color:var(--ok)}
+.en-note{background:#F2F7F3;color:#1C6E43;border-radius:var(--r-s);padding:10px 12px;font-size:14px;line-height:20px;margin-top:12px}
+
+/* 訊息 */
+.chat-list{flex:1;min-height:0;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;background:#FAFAF8;overscroll-behavior:contain}
+.chat-empty{margin:auto;font-size:14px;color:var(--muted);text-align:center;line-height:21px}
+.msg{max-width:80%;display:flex;flex-direction:column;animation:msgin var(--t-mid) var(--ease)}
+@keyframes msgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg .b{padding:9px 13px;border-radius:18px;font-size:15px;line-height:21px;overflow-wrap:anywhere;white-space:pre-wrap}
+.msg time{font-size:11px;color:var(--muted);margin-top:3px;padding:0 4px}
+.msg.mine{align-self:flex-end;align-items:flex-end}
+.msg.mine .b{background:var(--ink);color:#fff;border-bottom-right-radius:6px}
+.msg.them{align-self:flex-start}
+.msg.them .b{background:#ECEBE7;border-bottom-left-radius:6px}
+.msg.sys{align-self:center;max-width:92%;text-align:center}
+.msg.sys .b{background:none;padding:2px 8px;font-size:12px;line-height:18px;color:var(--muted)}
+.composer{flex:none;display:flex;align-items:flex-end;gap:8px;padding:8px 12px calc(var(--safe-bottom) + 8px);border-top:1px solid var(--line);background:var(--card)}
+.composer textarea{flex:1;min-width:0;min-height:44px;max-height:112px;border-radius:22px;border:1px solid var(--line);background:#FAFAF8;padding:10px 16px;font-size:16px;line-height:22px;resize:none;outline:0}
+.composer textarea:focus{border-color:#BDBDB7}
+.send{width:44px;height:44px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;transition:opacity var(--t-fast),transform var(--t-fast)}
+.send:disabled{opacity:.3}
+.send:active:not(:disabled){transform:scale(.92)}
+
+/* 地圖 */
+.map-wrap{position:relative;flex:1;min-height:180px;background:#ECEBE5;overflow:hidden}
+.map-wrap svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.map-tag{position:absolute;left:12px;top:12px;font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(255,255,255,.92);color:var(--muted)}
+.m-marker{transition:opacity var(--t-mid)}
+.m-halo{animation:mh 2.4s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mh{0%{transform:scale(.6);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+.m-route{fill:none;stroke:var(--ok);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.m-route-bg{fill:none;stroke:rgba(32,139,83,.2);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.map-foot{flex:none;padding:12px 16px calc(var(--safe-bottom) + 12px);display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line)}
+.map-info{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.map-info b{font-size:16px;font-weight:600}
+.map-info span{font-size:12px;color:var(--muted);white-space:nowrap}
+.map-note{font-size:13px;line-height:19px;color:var(--muted)}
+.map-foot .btn{min-height:48px;font-size:15px}
+.map-foot .row{display:flex;gap:8px}
+
+/* 個人設定 */
+.profile{position:absolute;inset:0;background:var(--bg);z-index:50;transform:translateX(102%);visibility:hidden;transition:transform var(--t-slow) var(--ease),visibility 0s linear var(--t-slow);display:flex;flex-direction:column}
+.profile.open{transform:none;visibility:visible;transition:transform var(--t-slow) var(--ease)}
+.pf-head{display:flex;align-items:center;gap:4px;padding:calc(var(--safe-top) + 6px) 12px 8px}
+.pf-head h2{font-size:17px;font-weight:600;flex:1;text-align:center;padding-right:44px}
+.back{width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.pf-body{flex:1;overflow:auto;padding:4px 20px calc(var(--safe-bottom) + 24px)}
+.pf-card{display:flex;gap:16px;align-items:center;padding:8px 0 16px}
+.pf-card .pic{width:72px;height:72px;flex:none}
+.pf-card .pic .avatar{font-size:26px}
+.pf-card b{display:block;font-size:20px;font-weight:600;overflow-wrap:anywhere}
+.pf-card p{font-size:14px;color:var(--muted);line-height:20px;margin-top:2px;overflow-wrap:anywhere}
+.field{display:block;margin-top:12px}
+.field span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.field input,.field textarea{display:block;width:100%;border:1px solid var(--line);border-radius:var(--r-s);background:var(--card);padding:11px 12px;font-size:16px;line-height:22px;outline:0;resize:none}
+.field input:focus,.field textarea:focus{border-color:#A9A9A4}
+.field-err{font-size:13px;color:var(--sos);min-height:18px;margin-top:4px}
+.swatches{display:flex;gap:10px;margin-top:4px}
+.sw{width:36px;height:36px;border-radius:50%;position:relative}
+.sw::after{content:"";position:absolute;inset:-4px}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
+.group-t{font-size:13px;color:var(--muted);margin:20px 0 6px;font-weight:500}
+.group{background:var(--card);border-radius:var(--r-m);overflow:hidden}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:52px;padding:10px 16px;text-align:left;font-size:15px}
+.group>.row+.row{border-top:1px solid var(--line)}
+.row small{display:block;font-size:12px;color:var(--muted);margin-top:1px;line-height:17px}
+.row .val{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:2px;white-space:nowrap}
+.row .val .i{width:16px;height:16px}
+.switch{position:relative;width:50px;height:30px;border-radius:15px;background:#D9D8D3;flex:none;transition:background var(--t-mid)}
+.switch::after{content:"";position:absolute;left:2px;top:2px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform var(--t-mid) var(--ease)}
+.switch[aria-checked="true"]{background:var(--ok)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+
+/* 提示 */
+.toast{position:absolute;left:16px;right:16px;top:calc(var(--safe-top) + 8px);z-index:60;background:rgba(32,32,32,.94);color:#fff;border-radius:var(--r-s);padding:10px 14px;font-size:14px;line-height:20px;
+  opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity var(--t-mid),transform var(--t-mid) var(--ease),visibility 0s linear var(--t-mid);pointer-events:none}
+.toast.on{opacity:1;visibility:visible;transform:none;transition:opacity var(--t-mid),transform var(--t-mid) var(--ease)}
+.phone[data-dark] .toast{background:#F4F5F7;color:#17191F}
+
+/* Demo 控制 */
+.panel{width:296px;max-height:min(844px,calc(100dvh - 32px));background:#fff;border-radius:var(--r-l);box-shadow:0 8px 28px rgba(0,0,0,.08);display:flex;flex-direction:column;flex:none;overflow:hidden}
+.panel[data-closed]{display:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px}
+.panel-head h3{font-size:15px;font-weight:600}
+.panel-head small{display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:1px}
+.panel-body{overflow:auto;padding:0 16px 16px}
+.panel-state{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);background:#F5F5F3;border-radius:10px;padding:7px 10px;margin-bottom:10px}
+.panel-state code{font-family:ui-monospace,Consolas,monospace;color:var(--ink)}
+.p-t{font-size:12px;color:var(--muted);margin:12px 0 6px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:#EFEEEA;border-radius:12px;padding:3px}
+.seg button{min-height:38px;border-radius:9px;font-size:14px;transition:background var(--t-fast)}
+.seg button[aria-pressed="true"]{background:#fff;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.seg button:disabled{opacity:.45}
+.p-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.p-btn{min-height:42px;border-radius:10px;background:#F2F1ED;font-size:13px;line-height:17px;padding:4px 8px;transition:background var(--t-fast)}
+.p-btn:hover:not(:disabled){background:#E8E7E2}
+.p-btn:disabled{opacity:.42}
+.p-btn.wide{grid-column:1/3}
+.p-btn.warn{color:var(--sos)}
+.p-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;min-height:42px}
+.p-row small{display:block;font-size:11px;color:var(--muted);line-height:15px}
+.p-hint{font-size:12px;line-height:17px;color:var(--muted);margin-top:8px}
+.handle{display:none}
+@media (max-width:1000px){
+  .panel{position:fixed;left:8px;right:8px;bottom:8px;width:auto;max-height:76%;z-index:100;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+  .handle{position:fixed;right:0;top:34%;z-index:90;width:26px;height:64px;border-radius:12px 0 0 12px;background:rgba(32,32,32,.5);color:#fff;font-size:10px;font-weight:600;writing-mode:vertical-rl;letter-spacing:.06em;display:flex;align-items:center;justify-content:center}
+  .handle::before{content:"";position:absolute;inset:-6px -2px -6px -14px}
+  .handle[data-open]{display:none}
+  .dual-row{display:none!important}
+}
+@media (min-width:1001px){.panel-close{display:none}}
+/* ===== 對齊 SafeRadius V2 的視覺（C:\Projects\callme\saferadius_demo_v2.html） ===== */
+@media (min-width:521px){
+  html,body{background:#F0F2F0}
+  body{background-image:radial-gradient(circle at 11% 12%,#FDE9E2 0,transparent 27%),radial-gradient(circle at 94% 85%,#E8EFE8 0,transparent 28%)}
+  .phone{border-radius:45px;box-shadow:0 0 0 9px #181D23,0 45px 95px rgba(18,24,29,.25)}
+}
+.phone{background:#FAFAF8}
+.statusbar::after{content:"";position:absolute;left:50%;top:8px;width:105px;height:28px;margin-left:-52px;border-radius:22px;background:#171A1E}
+.screen{background:#FAFAF8}
+.screen.dark{background:linear-gradient(160deg,#242C35,#151B22 65%)}
+.after.dark{background:linear-gradient(160deg,#242C35,#151B22 65%)}
+.btn{border-radius:15px;font-weight:700;font-size:15px}
+.btn.solid{background:#20272D}
+.btn.line{border:1px solid #E6E9E7;color:#424B4D}
+.btn.quiet{background:#29323B;border:1px solid #3B4550;color:#fff}
+.tool-row .btn{border-radius:15px}
+
+.brandrow{display:flex;align-items:center;gap:9px;min-width:0}
+.mark{width:29px;height:29px;border-radius:10px;display:grid;place-items:center;background:var(--sos);color:#fff;transform:rotate(-9deg);flex:none}
+.mark .i{transform:rotate(9deg);width:18px;height:18px}
+.home .brand{font-size:17px;font-weight:790;letter-spacing:-.04em;line-height:20px}
+.home .tagline{font-size:11px;margin-top:0;line-height:15px;color:#8A9090}
+.home-top{align-items:center}
+.avatar-btn{width:42px;height:42px}
+.avatar-btn .dot{width:12px;height:12px;background:#36AB7F;border-width:2px;border-color:#fff;right:0;bottom:1px}
+.notify-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:7px;border:1px solid #E8EBE8;padding:6px 12px;border-radius:999px;background:#fff;color:#69716F;font-size:12px;font-weight:600;margin-top:10px;white-space:nowrap}
+.notify-pill i{width:7px;height:7px;border-radius:50%;background:#2EAD79;box-shadow:0 0 0 3px #E5F5EB}
+.notify-pill i.off{background:#A4A9A7;box-shadow:0 0 0 3px #F0F1F0}
+.home-main{align-items:stretch;padding-top:12px}
+.home-main h1{font-size:29px;font-weight:780;letter-spacing:-.05em;margin-top:0;text-align:left;line-height:1.25}
+.home-main .sub{font-size:13px;color:#8A9090;text-align:left;margin-top:2px;line-height:1.55}
+.sos-wrap{--size:clamp(128px,18.5cqh,160px);width:calc(var(--size) + 50px);height:calc(var(--size) + 50px);margin:clamp(4px,1.8cqh,18px) auto 0}
+.sos-halo{background:radial-gradient(circle,#FFF1ED 0 57%,transparent 58%)}
+.sos-halo::before,.sos-halo::after{content:"";position:absolute;inset:3px;border-radius:50%;border:1px solid #F6E2DF}
+.sos-halo::after{inset:16px;border-color:#F5DAD6}
+.sos{box-shadow:0 16px 28px rgba(219,75,67,.22),inset 0 -5px 0 rgba(171,43,42,.12)}
+.sos b{font-size:calc(var(--size) * .175);font-weight:800;letter-spacing:.04em}
+.sos-ring{inset:-11px;width:calc(100% + 22px);height:calc(100% + 22px)}
+.sos-ring .prog{stroke:#C63B35}
+.hold-hint{font-size:13px;font-weight:670;color:#5C6565;margin-top:2px}
+.sos-sub{font-size:11px;color:#8F9594;text-align:center;line-height:16px}
+.brief{margin-top:clamp(6px,1.4cqh,14px);margin-bottom:0}
+.brief-box{border:1px solid #E7E9E6;border-radius:18px;padding:12px 15px;box-shadow:0 3px 12px #252D3105}
+.brief textarea::placeholder{color:#8F9694}
+.a11y-link{margin-top:4px;font-size:11px;color:#8A9090;min-height:32px;padding:6px 8px}
+.notify-card{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:8px;padding:12px 16px;border:1px solid #ECEEEC;border-radius:19px;background:#fff;flex:none}
+.notify-card .tx{display:flex;gap:12px;align-items:center;min-width:0}
+.notify-card .ic{width:38px;height:38px;background:#F4F7F5;color:#52846E;display:grid;place-items:center;border-radius:12px;flex:none}
+.notify-card b{display:block;font-size:13px;font-weight:700}
+.notify-card small{display:block;font-size:11px;color:#8F9694;margin-top:1px}
+@container (max-height:760px){.notify-card{display:none}}
+.home-foot{border-top:0;padding-top:2px;justify-content:center;gap:12px;flex-wrap:wrap}
+.home-foot .loc-state{font-size:11px;color:#888F8E}
+.home-foot .sep{width:1px;height:13px;background:#DDDFDE}
+.home .emg{gap:4px}
+.home .emg button,.searching .emg button{min-width:44px;height:40px;padding:0 8px;border:0;background:none;font-size:13px;font-weight:650;color:#565E5E;text-decoration:underline;text-decoration-color:#C6CBCA;text-underline-offset:4px}
+.home .emg button span{display:none}
+
+.searching{background:#FBFAF8}
+.pulse i{background:none;border:1px solid #F0C4BF;animation:wave 3.4s ease-out infinite}
+.pulse i:nth-child(2){animation-delay:1.13s}.pulse i:nth-child(3){animation-delay:2.26s}
+.pulse b{width:104px;height:104px;background:#FEE7E3;color:#D7514B}
+.pulse b .i{width:41px;height:41px}
+.searching h2{font-size:26px;font-weight:780;letter-spacing:-.05em}
+.searching .sub{font-size:13px;color:#899090}
+.search-status{font-size:12px;color:#626C6D}
+.sent{border:1px solid #ECEDEB;border-radius:20px}
+
+.incoming .eyebrow{color:#F2A49D;font-size:13px;font-weight:690}
+.big-avatar .avatar{background:#36414B}
+.incoming h2{font-size:27px;letter-spacing:-.04em;font-weight:700}
+.approx{color:#A6B1BC}
+.inc-brief{background:#29323C;border:1px solid #3A444F;border-radius:20px}
+.round.skip{background:#646972}
+.round.yes{background:#25A774}
+.tick{background:#25A774}
+
+.call-head .brand{font-size:13px;font-weight:740;color:#D4DCE3}
+.conn{color:#77DBA9}
+.conn i{background:#68DCA6}
+.call.ended .conn{color:var(--on-dark-muted)}
+.chip110{background:#29323B;border:1px solid #3B4550}
+.voice{display:none}
+.big-avatar .avatar{background:#353E49}
+.call-mid .big-avatar{margin-bottom:8px}
+.call h2{font-size:22px;letter-spacing:-.03em;font-weight:700}
+.timer{font-size:13px}
+.eq{display:flex;justify-content:center;align-items:center;gap:4px;height:18px;margin-top:6px}
+.eq i{width:3px;border-radius:5px;background:#57CF9B;animation:eq .85s ease-in-out infinite alternate}
+.eq i:nth-child(1){height:6px}.eq i:nth-child(2){height:15px;animation-delay:.2s}.eq i:nth-child(3){height:9px;animation-delay:.4s}.eq i:nth-child(4){height:13px;animation-delay:.1s}.eq i:nth-child(5){height:5px;animation-delay:.3s}
+@keyframes eq{to{height:3px;opacity:.6}}
+.call.ended .eq{display:none}
+.help-status{display:flex;align-items:center;gap:11px;width:100%;margin-top:clamp(6px,1.6cqh,14px);padding:12px 13px;border-radius:19px;background:#28313B;border:1px solid #35414D;font-size:14px;font-weight:650;color:#fff;text-align:left}
+.help-status::before{content:"";width:9px;height:9px;border-radius:50%;background:#76E6B2;box-shadow:0 0 0 5px #34463F;margin:0 5px;flex:none}
+.help-status.go{background:#28313B;color:#76E6B2}
+.help-status.end{background:#28313B;color:var(--on-dark-muted)}
+.help-status.end::before{background:#7A808C;box-shadow:0 0 0 5px #39434E}
+.call-brief{background:none;border:1px solid #35414D;color:#C6D1D9;border-radius:12px;font-size:13px;margin-top:8px}
+.call-brief small{color:#9FADB8}
+.ctl{color:#DAE2E6;font-size:11px}
+.ctl .disc{width:54px;height:54px;background:#39434E}
+.ctl[aria-pressed="true"] .disc{background:#E7ECEF;color:#151A21}
+.ctl.hang .disc{background:#DF5650}
+.badge{background:#E65C51;border:2px solid #161D24;line-height:16px}
+
+.scrim{background:#0B0E13A8}
+.sheet{background:#FCFCFA;box-shadow:0 -20px 80px #0003}
+.grip::after{width:41px;height:5px;margin-left:-20px;background:#D9DDDB}
+.mini-btn{background:#F0F2F0}
+.mini-btn.hang{background:#DF5650}
+.chat-list{background:#FCFCFA}
+.msg.mine .b{background:#2F9774}
+.msg.them .b{background:#EFF2EE;color:#34413D}
+.composer textarea{border-radius:14px;background:#F6F8F5;border-color:#E6E9E5}
+.send{border-radius:14px;background:#269876}
+.opt{border-radius:15px}
+.opt.primary{background:#20272D;border-color:#20272D}
+.en-note{background:#E7F6ED;color:#1F7A5A}
+.map-wrap{background:#F5F2E9}
+.m-route{stroke:#2D9D76}
+.m-route-bg{stroke:rgba(45,157,118,.2)}
+.switch{width:44px;height:26px;background:#E2E4E3}
+.switch::after{width:20px;height:20px;left:3px;top:3px}
+.switch[aria-checked="true"]{background:#3CA77D}
+.switch[aria-checked="true"]::after{transform:translateX(18px)}
+.pf-card .pic .avatar{border-radius:20px;background:#E9F2EC}
+.group{border:1px solid #ECEEEC;border-radius:19px}
+.panel{border:1px solid #E8EAE8;border-radius:23px;box-shadow:0 12px 30px #19262406}
+.toast{background:#202930;border-radius:14px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .pulse i{opacity:.5;transform:scale(.8)}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.500-4.600-7.500-10.200A4.300 4.300 0 0 1 12 7.200a4.300 4.300 0 0 1 7.500 2.600C19.500 15.400 12 20 12 20z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.500V11a6 6 0 1 1 12 0v5.500l1.500 1.500h-15zM10 20.500a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M9 9.5V6a3 3 0 0 1 5.8-1M15 11v.2a3 3 0 0 1-4.3 2.6M5 11a7 7 0 0 0 11 5.7M19 11a7 7 0 0 1-.6 2.8M12 18v3M4 4l16 16"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 10v4h3.5L12 18V6L7.5 10H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l.9-4.4A8 8 0 1 1 20 12z"/></symbol>
+    <symbol id="i-hang" viewBox="0 0 24 24"><path d="M3 14.5c5-4.7 13-4.7 18 0l-2.2 2.6-3.6-1.2-.4-2.6a10 10 0 0 0-5.6 0l-.4 2.6-3.6 1.2L3 14.5z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.6 3.5 9.5 3l1.6 4-2 1.5a12 12 0 0 0 6.4 6.4l1.5-2 4 1.6-.5 2.9a2 2 0 0 1-2 1.6A16 16 0 0 1 5 5.5a2 2 0 0 1 1.6-2z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.500 4.500 4.500L19 7.500"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage" id="stage"></div>
+<button class="handle" id="handle" aria-label="開啟 Demo 控制">DEMO</button>
+
+<script>
+'use strict';
+/* ========== 常數與模擬資料（全部虛構） ========== */
+const HOLD_MS = 2000, DEVICES = ['me','peer'];
+const PERSONA = { requester:'小晴', helpers:['陳小芸','阿哲','吳姐'], peerColor:'#6B5B7B' };
+const LINES = {
+  requester:['我在便利商店附近，有人在跟著我。','我現在在店裡了。','謝謝你，我先待在店裡。'],
+  helper:['我先陪你通話，你可以往有店員的地方走嗎？','好的，我會保持連線。','我離你不遠，有需要就告訴我。'],
+};
+const SIM_BRIEF = '我好像被陌生人尾隨';
+const ROUTE_M = 860, ROUTE_MIN = 11;
+const COLORS = ['#46505F','#2F6F5E','#7A5C3E','#6B5B7B','#35637F'];
+
+const icon = n => `<svg class="i" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+
+/* ========== 集中式狀態：事件、通話、前往、位置、訊息、個人、Demo 分開管理 ========== */
+const newUi = () => ({ sheet:null, emergency:null, simDial:false, info:null, profile:false, editing:false, holding:false, tapArmed:false, draft:'', chatDraft:'', briefOpen:false });
+const initial = () => ({
+  profile:{ name:'林予安', bio:'住在這附近，下班後通常都在。', color:COLORS[0], notify:true, sound:true, vibrate:true, locationPerm:true },
+  event:null,
+  call:{ status:'none', startedAt:null, base:0, endReason:null, mute:{requester:false,helper:false}, speaker:{requester:false,helper:false} },
+  help:{ status:'none', progress:0, decided:false },
+  location:{ shared:false },
+  chat:{ messages:[], unread:{requester:0,helper:0}, cursor:{requester:0,helper:0} },
+  demo:{ view:'me', dual:false, auto:true, panelOpen:window.innerWidth>1000 },
+  ui:{ me:newUi(), peer:newUi() },
+});
+let S = initial();
+let seq = 0, msgSeq = 0;
+
+/* ---------- 計時器：都記名、都能一起清掉，事件換了就不執行 ---------- */
+const timers = new Map();
+function later(key, ms, fn){
+  clearTimeout(timers.get(key));
+  const eid = S.event && S.event.id;
+  timers.set(key, setTimeout(()=>{ timers.delete(key); if(eid && (!S.event || S.event.id!==eid)) return; fn(); sync(); }, ms));
+}
+function cancel(...keys){ keys.forEach(k=>{ clearTimeout(timers.get(k)); timers.delete(k); }); }
+function cancelAll(){ timers.forEach(t=>clearTimeout(t)); timers.clear(); }
+
+/* ---------- 衍生值 ---------- */
+const other = d => d==='me' ? 'peer' : 'me';
+const reqDev = () => S.event ? S.event.requesterDevice : null;
+const helpDev = () => S.event ? other(S.event.requesterDevice) : null;
+const roleOf = d => !S.event ? null : (d===reqDev() ? 'requester' : 'helper');
+const devOfRole = r => r==='requester' ? reqDev() : helpDev();
+const requesterName = () => reqDev()==='me' ? S.profile.name : PERSONA.requester;
+const helperName = () => (helpDev()==='me' && S.event.candidateIdx===0) ? S.profile.name : PERSONA.helpers[S.event.candidateIdx];
+const nameOfRole = r => r==='requester' ? requesterName() : helperName();
+const maskName = n => { const c=[...n]; return c.length<=1 ? n+'○' : c[0]+'○'.repeat(Math.min(c.length-1,2)); };
+const colorOf = name => name===S.profile.name ? S.profile.color : (name===PERSONA.requester ? PERSONA.peerColor : '#3A5F78');
+const autoOn = () => S.demo.auto && !S.demo.dual;
+const isSim = role => S.event && autoOn() && devOfRole(role)!==S.demo.view;
+const fmt = sec => `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+const nowHM = () => new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+function callSeconds(){
+  const c=S.call; const live = c.status==='active' ? (Date.now()-c.startedAt)/1000 : 0;
+  return Math.floor(c.base+live);
+}
+function viewOf(d){
+  const e=S.event; if(!e) return 'home';
+  if(roleOf(d)==='requester'){
+    if(e.ack.requester) return 'home';
+    return {searching:'searching',searchingAgain:'searching',connecting:'connecting',inCall:'call',callEnded:'call',resolved:'resolved'}[e.phase];
+  }
+  if(e.helperLeft || e.ack.helper) return 'home';
+  return {searching:e.ringing?'incoming':'home',searchingAgain:e.ringing?'incoming':'home',connecting:'connecting',inCall:'call',callEnded:'helperEnded',resolved:'resolved'}[e.phase];
+}
+function machine(d){
+  const e=S.event;
+  if(viewOf(d)==='home' && S.ui[d].holding) return 'sosHolding';
+  if(!e) return 'idle';
+  switch(e.phase){
+    case 'searching': return e.ringing?'incoming':'searching';
+    case 'searchingAgain': return e.ringing?'incoming':'searchingAgain';
+    case 'inCall': return ({offered:'helperOffered',enRoute:'helperEnRoute',arrived:'helperArrived'})[S.help.status]||'inCall';
+    default: return e.phase;
+  }
+}
+function statusFor(role){
+  const s=S.help.status, sh=S.location.shared;
+  if(S.call.status==='ended') return {t:'通話已結束',c:'end'};
+  if(role==='requester'){
+    if(s==='offered') return {t:sh?'協助者準備前往':'協助者願意前往',c:'go'};
+    if(s==='enRoute') return {t:'協助者前往中',c:'go'};
+    if(s==='arrived') return {t:'協助者已抵達',c:'go'};
+    return {t:'正在語音協助',c:''};
+  }
+  if(s==='offered') return {t:sh?'你準備前往':'你已表示願意前往',c:'go'};
+  if(s==='enRoute') return {t:'你正在前往',c:'go'};
+  if(s==='arrived') return {t:'你已回報抵達',c:'go'};
+  return {t:'正在語音協助',c:''};
+}
+
+/* ---------- 回饋：觸覺、鈴聲、提示 ---------- */
+function buzz(p){ if(S.profile.vibrate && navigator.vibrate){ try{navigator.vibrate(p)}catch(_){} } }
+let audio=null, ringTimer=null;
+function unlockAudio(){ if(!audio){ try{ audio=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} } if(audio&&audio.state==='suspended') audio.resume().catch(()=>{}); }
+function tone(f,t,d){ const o=audio.createOscillator(),g=audio.createGain(); o.frequency.value=f; o.type='sine';
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.05,t+.03); g.gain.linearRampToValueAtTime(0,t+d);
+  o.connect(g).connect(audio.destination); o.start(t); o.stop(t+d+.02); }
+function ringOnce(){ if(!audio) return; try{ const t=audio.currentTime; tone(659,t,.35); tone(880,t+.4,.45); }catch(_){} buzz([200,120,200]); }
+function syncRing(){
+  const e=S.event, vis = e && e.ringing && !e.helperLeft && (S.demo.dual || helpDev()===S.demo.view);
+  const want = vis && S.profile.sound;
+  if(want && !ringTimer){ ringOnce(); ringTimer=setInterval(ringOnce,2400); }
+  if(!want && ringTimer){ clearInterval(ringTimer); ringTimer=null; }
+}
+const toastT={};
+function toast(d,text,ms=2800){
+  const el=phones[d].querySelector('.toast'); el.textContent=text; el.classList.add('on');
+  clearTimeout(toastT[d]); toastT[d]=setTimeout(()=>el.classList.remove('on'),ms);
+}
+function toastVisible(text){ (S.demo.dual?DEVICES:[S.demo.view]).forEach(d=>toast(d,text)); }
+
+/* ---------- 訊息 ---------- */
+function pushMsg(from,text){
+  S.chat.messages.push({id:++msgSeq,from,text,at:nowHM()});
+  if(from==='system') return;
+  const to = from==='requester'?'helper':'requester';
+  const d = devOfRole(to);
+  if(S.ui[d].sheet!=='chat'){ S.chat.unread[to]++; }
+}
+function nextLine(role){ const a=LINES[role]; const i=S.chat.cursor[role]; S.chat.cursor[role]=Math.min(i+1,a.length-1); return a[i]; }
+function resetRound(){
+  S.call={ status:'none', startedAt:null, base:0, endReason:null, mute:{requester:false,helper:false}, speaker:{requester:false,helper:false} };
+  S.help={ status:'none', progress:0, decided:false };
+  S.location.shared=false;
+  S.chat={ messages:[], unread:{requester:0,helper:0}, cursor:{requester:0,helper:0} };
+  DEVICES.forEach(d=>{ S.ui[d].sheet=null; S.ui[d].chatDraft=''; S.ui[d].briefOpen=false; });
+  stopProgress();
+}
+/* ---------- 模擬前往進度 ---------- */
+let progressT=null;
+function startProgress(){
+  stopProgress();
+  progressT=setInterval(()=>{
+    if(S.help.status!=='enRoute'){ stopProgress(); return; }
+    S.help.progress=Math.min(1,S.help.progress+1/90);
+    if(S.help.progress>=1){ stopProgress(); if(isSim('helper')) act.arrive(); }
+    sync();
+  },500);
+}
+function stopProgress(){ clearInterval(progressT); progressT=null; }
+
+/* ========== 狀態轉移：所有改動都走這裡，先檢查再改 ========== */
+function startEvent(requesterDevice,brief){
+  cancelAll(); resetRound();
+  S.event={ id:++seq, requesterDevice, brief:brief.trim(), phase:'searching', ringing:false, candidateIdx:0, helperLeft:false, waitingLong:false, prevEnRoute:null, ack:{requester:false,helper:false}, summary:null };
+  scheduleRing(requesterDevice===S.demo.view?900:500);
+  later('long',20000,()=>{ if(S.event&&/searching/.test(S.event.phase)) S.event.waitingLong=true; });
+}
+function scheduleRing(ms){
+  later('ring',ms,()=>{
+    const e=S.event; if(!e||!/searching/.test(e.phase)) return;
+    e.ringing=true; if(!e.helperLeft) buzz(60);
+    if(isSim('helper')) later('autoAccept',3200,()=>act.accept());
+  });
+}
+const act = {
+  sendSOS(d,brief){
+    if(viewOf(d)!=='home') return false;
+    startEvent(d,brief); buzz([40,60,120]); return true;
+  },
+  simIncoming(){
+    if(S.demo.view!=='me') S.demo.view='me';
+    if(!S.profile.notify){ toast('me','你已關閉「接收附近求助」，這筆模擬求助不會響鈴。'); return; }
+    startEvent('peer',SIM_BRIEF);
+  },
+  cancelSearch(){
+    const e=S.event; if(!e||!/searching/.test(e.phase)) return;
+    cancelAll(); S.event=null; resetRound(); toastVisible('已取消求助');
+  },
+  accept(){
+    const e=S.event; if(!e||!e.ringing) return;
+    cancel('autoAccept','long','ring'); e.ringing=false; e.waitingLong=false; e.phase='connecting'; buzz(50);
+    later('conn',900,()=>beginCall());
+  },
+  skip(){
+    const e=S.event; if(!e||!e.ringing) return;
+    cancel('autoAccept'); e.ringing=false;
+    const viewerIsHelper = autoOn() && helpDev()===S.demo.view;
+    const last = e.candidateIdx>=PERSONA.helpers.length-1;
+    if(viewerIsHelper){
+      e.helperLeft=true; e.candidateIdx = last?0:e.candidateIdx+1;
+      toast(helpDev(),'已略過，系統會通知下一位協助者（Demo 模擬）');
+      later('autoAccept',3000,()=>{ e.ringing=true; act.accept(); });
+      return;
+    }
+    if(last){ e.candidateIdx=0; e.waitingLong=true; toastVisible('模擬名單已輪完。求助仍在等待，可用 Demo 控制再模擬接聽。'); return; }
+    e.candidateIdx++;
+    toastVisible(`已略過，模擬通知下一位協助者：${helperName()}`);
+    scheduleRing(1200);
+  },
+  hangup(d,reason){
+    const e=S.event; if(!e||e.phase!=='inCall') return;
+    cancel('reply','autoOffer','autoStart','autoShare');
+    S.call.base=callSeconds(); S.call.status='ended'; S.call.startedAt=null;
+    S.call.endReason=reason||roleOf(d);
+    e.phase='callEnded';
+    DEVICES.forEach(x=>{ S.ui[x].sheet=null; });
+    S.help.decided=false; buzz(30);
+  },
+  reconnect(){
+    const e=S.event; if(!e||e.phase!=='callEnded'||S.call.endReason!=='dropped') return;
+    e.phase='connecting'; S.call.status='none'; e.helperLeft=false;
+    later('conn',900,()=>beginCall(true));
+  },
+  continueSearch(){
+    const e=S.event; if(!e||e.phase!=='callEnded') return;
+    const prev=S.help.status==='enRoute'?helperName():null;
+    const keep=S.call.endReason;
+    resetRound();
+    e.prevEnRoute=prev; e.phase='searchingAgain'; e.helperLeft=false; e.waitingLong=false;
+    e.candidateIdx=(e.candidateIdx+1)%PERSONA.helpers.length; e.ack={requester:false,helper:false}; void keep;
+    scheduleRing(1400);
+    later('long',20000,()=>{ if(S.event&&/searching/.test(S.event.phase)) S.event.waitingLong=true; });
+  },
+  resolve(){
+    const e=S.event; if(!e||e.phase!=='callEnded') return;
+    cancelAll(); stopProgress();
+    e.summary={ dur:fmt(S.call.base), msgs:S.chat.messages.filter(m=>m.from!=='system').length, wasGoing:S.help.status==='enRoute'||S.help.status==='offered' };
+    e.phase='resolved'; S.location.shared=false; S.help.status='none';
+    DEVICES.forEach(x=>{ S.ui[x].sheet=null; });
+    buzz(40);
+  },
+  ack(d){
+    const e=S.event; if(!e) return;
+    const r=roleOf(d); e.ack[r]=true;
+    if(r==='requester') S.ui[d].draft='';
+    const otherDone = r==='requester' ? (e.ack.helper||e.helperLeft||isSim('helper')) : (e.ack.requester||isSim('requester'));
+    if(otherDone){ S.event=null; resetRound(); }
+  },
+  finishHelper(d){
+    const e=S.event; if(!e||e.phase!=='callEnded') return;
+    if(isSim('requester')){ cancelAll(); S.event=null; resetRound(); toast(d,'已完成本次通話。對方的求助狀態由對方決定。'); return; }
+    e.helperLeft=true; S.ui[d].sheet=null; toast(d,'已完成本次通話。對方的求助仍由對方決定。');
+  },
+  offer(){
+    if(!S.event||S.event.phase!=='inCall'||S.help.status!=='none') return;
+    cancel('autoOffer');
+    S.help.status='offered';
+    pushMsg('system',`${helperName()} 表示願意前往，尚未出發`);
+    const d=reqDev(); if(viewOf(d)==='call'&&!S.location.shared) toast(d,`${helperName()} 願意前往。要不要分享你的位置，由你決定。`);
+    if(isSim('requester')) later('autoShare',3000,()=>{ act.share(); pushMsg('requester',nextLine('requester')); });
+    if(isSim('helper')&&S.location.shared) later('autoStart',3500,()=>act.start());
+  },
+  start(){
+    if(S.help.status!=='offered'||!S.location.shared) return;
+    S.help.status='enRoute'; S.help.progress=0; S.help.decided=true; cancel('autoStart');
+    pushMsg('system',`${helperName()} 已開始前往（Demo 模擬路線）`);
+    startProgress();
+  },
+  arrive(){
+    if(S.help.status!=='enRoute') return;
+    stopProgress(); S.help.status='arrived'; S.help.progress=1;
+    pushMsg('system',`${helperName()} 回報已抵達（Demo 模擬）`); buzz(60);
+  },
+  cancelGo(){
+    if(S.help.status!=='offered'&&S.help.status!=='enRoute') return;
+    stopProgress(); cancel('autoStart'); S.help.status='none'; S.help.progress=0; S.help.decided=true;
+    pushMsg('system',`${helperName()} 取消了前往，通話中仍可協助`);
+    const d=reqDev(); if(viewOf(d)==='call') toast(d,`${helperName()} 取消了前往`);
+  },
+  keepGoing(){
+    S.help.decided=true;
+    if(S.help.status==='offered'&&S.location.shared) act.start();
+  },
+  share(d){
+    if(!S.event||S.event.phase!=='inCall'||S.location.shared) return;
+    if(reqDev()==='me'&&!S.profile.locationPerm){ toast(d||'me','位置權限未開啟，請到個人設定開啟（Demo 模擬權限）。'); return; }
+    S.location.shared=true; pushMsg('system','位置已分享給協助者'); buzz(30);
+    if(isSim('helper')){
+      if(S.help.status==='none') later('autoOffer',2500,()=>{ act.offer(); });
+      else if(S.help.status==='offered') later('autoStart',3000,()=>act.start());
+    }
+  },
+  stopShare(){
+    if(!S.location.shared) return;
+    S.location.shared=false; pushMsg('system','求助者已停止分享位置');
+    cancel('autoStart');
+    if(helpDev()&&viewOf(helpDev())==='call') toast(helpDev(),'對方已停止分享位置，路線已隱藏');
+  },
+  send(role,text){
+    const t=text.trim(); if(!t||!S.event||S.event.phase!=='inCall') return false;
+    pushMsg(role,t);
+    const o=role==='requester'?'helper':'requester';
+    if(isSim(o)) later('reply',1800,()=>{ if(S.event.phase==='inCall') pushMsg(o,nextLine(o)); });
+    return true;
+  },
+};
+function beginCall(resumed){
+  const e=S.event; if(!e) return;
+  e.phase='inCall'; S.call.status='active'; S.call.startedAt=Date.now(); S.call.endReason=null;
+  if(!resumed) S.call.base=0;
+  if(isSim('requester')) later('peerFirst',1600,()=>{ if(S.event.phase==='inCall'&&!S.chat.messages.some(m=>m.from==='requester')) pushMsg('requester',nextLine('requester')); });
+  if(isSim('helper')&&!resumed) later('autoOffer',14000,()=>{ if(S.event.phase==='inCall') act.offer(); });
+}
+
+/* ========== 畫面模板 ========== */
+function mapSVG(){
+  // 直式比例：路線集中在中央，手機上被裁切時也不會裁到兩個標記
+  const xs=[-60,60,130,215,300,370,480], ys=[-60,110,200,290,370,430,560];
+  const route='M60 370 L130 370 L130 290 L215 290 L215 200 L300 200 L300 110 L262 110';
+  let cells='';
+  for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){
+    if(i===3&&j===2) continue; // 公園
+    const x=xs[i]+9,y=ys[j]+9,w=xs[i+1]-xs[i]-18,h=ys[j+1]-ys[j]-18;
+    if((i*3+j*5)%4===0&&h>40){ const a=Math.round(h*.55); cells+=`<rect x="${x}" y="${y}" width="${w}" height="${a}" rx="4"/><rect x="${x}" y="${y+a+7}" width="${w}" height="${h-a-7}" rx="4"/>`; }
+    else cells+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4"/>`;
+  }
+  return `<svg viewBox="0 0 420 500" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Demo 模擬街區地圖，不是真實街道">
+  <rect x="-100" y="-100" width="620" height="700" fill="#F5F2E9"/>
+  <g transform="rotate(-3 210 250)">
+    <g fill="#EEF0E6">${cells}</g>
+    <rect x="224" y="209" width="67" height="72" rx="8" fill="#DDEBD9"/>
+    <path d="M-80 470 C 40 440, 120 500, 200 580 L -80 580 Z" fill="#D8E6EA"/>
+    <g fill="none" stroke="#fff" stroke-linecap="butt">
+      <path d="M -80 200 H 500 M -80 370 H 500 M 60 -80 V 600 M 215 -80 V 600 M 370 -80 V 600" stroke-width="8"/>
+      <path d="M -80 110 H 500 M -80 290 H 500 M -80 430 H 500 M 130 -80 V 600 M 300 -80 V 600" stroke-width="14"/>
+    </g>
+    <g font-size="10" fill="#9A9A92" font-family="inherit">
+      <text x="146" y="104">示範一路</text>
+      <text x="142" y="284">示範二路</text>
+      <text x="238" y="248">示範公園</text>
+    </g>
+    <circle data-approx cx="250" cy="130" r="72" fill="rgba(216,61,56,.13)" stroke="rgba(216,61,56,.35)" stroke-dasharray="4 5"/>
+    <path class="m-route-bg" data-route-bg d="${route}"/>
+    <path class="m-route" data-route d="${route}"/>
+    <g class="m-marker" data-m-req transform="translate(262 110)">
+      <circle class="m-halo" r="16" fill="rgba(227,90,79,.3)"/><circle r="8" fill="#E35A4F" stroke="#fff" stroke-width="3"/>
+    </g>
+    <g class="m-marker" data-m-help transform="translate(60 370)">
+      <circle r="10" fill="#246DA5" stroke="#fff" stroke-width="3"/><circle r="3" fill="#fff"/>
+    </g>
+  </g>
+</svg>`;
+}
+function emgButtons(){
+  return `<div class="emg"><button data-act="emergency" data-arg="110" aria-label="110 警察，開啟 Demo 確認畫面">110<span>警察</span></button><button data-act="emergency" data-arg="119" aria-label="119 消防救護，開啟 Demo 確認畫面">119<span>消防救護</span></button></div>`;
+}
+function phoneHTML(d){
+  return `
+  <div class="statusbar" aria-hidden="true"><span>9:41</span><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:10px"></i></span></div>
+
+  <div class="screen home" data-screen="home">
+    <header class="home-top">
+      <div class="brandrow"><span class="mark">${icon('heart')}</span><div><div class="brand">SafeRadius</div><div class="tagline">附近真人即時互助</div></div></div>
+      <button class="avatar-btn" data-act="openProfile" aria-label="個人資訊與設定"><span class="avatar" data-my-avatar></span><span class="dot" data-notify-dot></span></button>
+    </header>
+    <p class="notify-pill"><i data-notify-pill-dot></i><span data-notify-line></span></p>
+    <div class="home-main">
+      <h1>需要幫助嗎？</h1>
+      <p class="sub">附近的人，願意聆聽你的求助</p>
+      <div class="sos-wrap">
+        <span class="sos-halo"></span>
+        <button class="sos" data-sos aria-label="立即求助。按住兩秒發送，放開可取消。" aria-describedby="hint-${d}">
+          <svg class="sos-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="prog" cx="50" cy="50" r="48.5" pathLength="100"/></svg>
+          <b>立即求助</b>
+        </button>
+      </div>
+      <p class="hold-hint" id="hint-${d}" data-hold-hint aria-live="polite">長按 2 秒，發出求助</p>
+      <p class="sos-sub">中途放開可取消</p>
+      <div class="brief">
+        <div class="brief-box"><textarea data-draft rows="1" maxlength="120" placeholder="簡單描述你遇到的狀況（選填）" aria-label="事件簡述（選填）"></textarea>
+        <div class="count" data-count hidden></div></div>
+        <div class="notify-card" data-notify-card>
+          <div class="tx"><span class="ic">${icon('bell')}</span><div><b>接收附近求助</b><small>開啟後才會收到即時求助來電</small></div></div>
+          <button class="switch" role="switch" data-act="toggleSetting" data-arg="notify" data-home-notify aria-label="接收附近求助"></button>
+        </div>
+        <button class="a11y-link" data-act="tapSos" data-tap-label>無法長按？改用連按兩次發送</button>
+      </div>
+    </div>
+    <footer class="home-foot">
+      <span class="loc-state"><i data-loc-dot></i><span data-loc-text></span></span>
+      <span class="sep" aria-hidden="true"></span>
+      ${emgButtons()}
+    </footer>
+  </div>
+
+  <div class="screen searching" data-screen="searching">
+    <div class="top-row"><span class="brand">SafeRadius</span><span class="demo-tag">Demo 模擬</span></div>
+    <div class="pulse" aria-hidden="true"><i></i><i></i><i></i><b>${icon('phone')}</b></div>
+    <h2 data-search-title>正在尋找附近協助者</h2>
+    <p class="sub" data-search-sub>你的求助已送出，正在等待有人接聽</p>
+    <p class="search-status" data-search-status aria-live="polite"></p>
+    <div class="sent" data-sent><small>已發送的事件簡述</small><p data-sent-text></p></div>
+    <div class="search-actions">
+      ${emgButtons()}
+      <button class="btn line" data-act="cancelSearch">取消求助</button>
+    </div>
+  </div>
+
+  <div class="screen dark incoming" data-screen="incoming" role="alertdialog" aria-label="附近即時求助來電">
+    <div class="top-row"><span class="brand" style="color:var(--on-dark)">SafeRadius</span><span class="demo-tag">Demo 模擬來電</span></div>
+    <p class="eyebrow">附近即時求助</p>
+    <div class="big-avatar"><span class="ring-a"></span><span class="avatar" data-inc-avatar></span></div>
+    <h2 data-inc-name></h2>
+    <p class="approx">${icon('pin')}<span>概略位置：約 300 公尺內（Demo 模擬）</span></p>
+    <div class="inc-brief"><small>事件簡述</small><p data-inc-brief></p></div>
+    <p class="persona-note" data-persona-note></p>
+    <div class="inc-actions">
+      <button class="round-col" data-act="skip"><span class="round skip">${icon('x')}</span>略過</button>
+      <button class="round-col" data-act="accept"><span class="round yes">${icon('phone')}</span>接聽協助</button>
+    </div>
+  </div>
+
+  <div class="screen dark connecting" data-screen="connecting">
+    <div class="tick" data-tick>${icon('check')}</div>
+    <h2 data-conn-title>已接通</h2>
+    <p data-conn-sub>正在建立語音連線（Demo 模擬）</p>
+  </div>
+
+  <div class="screen dark call" data-screen="call">
+    <header class="call-head">
+      <div class="l"><div class="brand">SafeRadius</div><div class="conn"><i></i><span data-conn-state>語音連線中 · Demo 模擬</span></div></div>
+      <button class="chip110" data-act="emergency" data-arg="110" data-chip110 aria-label="110 警察，開啟 Demo 確認畫面">110</button>
+    </header>
+    <div class="call-mid">
+      <div class="big-avatar"><span class="voice"></span><span class="avatar" data-call-avatar></span></div>
+      <h2 data-call-name></h2>
+      <div class="timer" data-timer role="timer">00:00</div>
+      <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="help-status" data-help-status aria-live="polite"></div>
+      <button class="call-brief" data-act="toggleBrief" data-call-brief><small>事件簡述</small><p data-call-brief-text></p></button>
+    </div>
+    <div class="call-tools" data-call-tools>
+      <div class="loc-line" data-loc-line hidden><span>位置已分享給協助者</span><button data-act="stopShare">停止分享</button></div>
+      <p class="go-hint" data-go-hint hidden></p>
+      <div class="tool-row" data-row-main></div>
+      <div class="tool-row"><button class="btn quiet" data-act="openMap">${icon('pin')}位置與導航</button></div>
+    </div>
+    <div class="controls">
+      <button class="ctl" data-act="toggleMute" data-ctl-mute aria-pressed="false"><span class="disc" data-mute-ic>${icon('mic')}</span><span data-mute-t>靜音</span></button>
+      <button class="ctl" data-act="toggleSpeaker" data-ctl-spk aria-pressed="false"><span class="disc">${icon('speaker')}</span><span>擴音</span></button>
+      <button class="ctl" data-act="openChat" data-ctl-chat><span class="disc">${icon('chat')}</span><span class="badge" data-badge hidden></span><span>訊息</span></button>
+      <button class="ctl hang" data-act="hangup" data-ctl-hang><span class="disc">${icon('hang')}</span><span>掛斷</span></button>
+    </div>
+  </div>
+
+  <div class="screen dark after" data-screen="helperEnded">
+    <div class="ic-dim">${icon('phone')}</div>
+    <h2 data-he-title>通話已結束</h2>
+    <p class="sub" data-he-sub></p>
+    <div class="ask" data-he-ask hidden><b>你先前答應前往</b>要繼續前往，還是取消這個承諾？對方會同步看到。</div>
+    <div class="acts" data-he-acts></div>
+  </div>
+
+  <div class="screen after" data-screen="resolved">
+    <div class="tick soft">${icon('check')}</div>
+    <h2 data-res-title></h2>
+    <p class="sub" data-res-sub></p>
+    <div class="sum" data-res-sum></div>
+    <div class="acts"><button class="btn solid" data-act="ack">返回首頁</button></div>
+  </div>
+
+  <div class="scrim" data-scrim data-act="scrim"></div>
+
+  <section class="sheet full" data-sheet="chat" role="dialog" aria-label="訊息">
+    <button class="grip" data-grip aria-label="收合訊息"></button>
+    <div class="mini-call">
+      <span class="who" data-mini-who></span>
+      <button class="mini-btn" data-act="toggleMute" data-mini-mute aria-label="靜音" aria-pressed="false">${icon('mic')}</button>
+      <button class="mini-btn hang" data-act="hangup" aria-label="掛斷">${icon('hang')}</button>
+      <button class="mini-btn" data-act="closeSheet" aria-label="收合訊息，回到通話">${icon('x')}</button>
+    </div>
+    <div class="chat-list" data-chat-list aria-live="polite"></div>
+    <div class="composer">
+      <textarea data-chat-input rows="1" maxlength="300" placeholder="輸入訊息" aria-label="輸入訊息"></textarea>
+      <button class="send" data-act="send" data-send aria-label="送出訊息" disabled>${icon('send')}</button>
+    </div>
+  </section>
+
+  <section class="sheet full" data-sheet="map" role="dialog" aria-label="位置與導航">
+    <button class="grip" data-grip aria-label="收合地圖"></button>
+    <div class="mini-call">
+      <span class="who" data-mini-who></span>
+      <button class="mini-btn" data-act="toggleMute" data-mini-mute aria-label="靜音" aria-pressed="false">${icon('mic')}</button>
+      <button class="mini-btn hang" data-act="hangup" data-mini-hang aria-label="掛斷">${icon('hang')}</button>
+      <button class="mini-btn" data-act="closeSheet" aria-label="收合地圖，回到通話">${icon('x')}</button>
+    </div>
+    <div class="map-wrap">${mapSVG()}<span class="map-tag">Demo 模擬地圖，非真實街道</span></div>
+    <div class="map-foot">
+      <div class="map-info"><b data-map-title></b><span data-map-dist></span></div>
+      <p class="map-note" data-map-note></p>
+      <div class="row" style="padding:0;min-height:0;gap:8px" data-map-actions></div>
+    </div>
+  </section>
+
+  <section class="sheet" data-sheet="end" role="dialog" aria-labelledby="end-${d}" aria-modal="true">
+    <span class="grip" style="cursor:default" aria-hidden="true"></span>
+    <div class="sheet-body">
+      <h3 id="end-${d}" style="font-size:20px;font-weight:700" data-end-title>你還需要幫助嗎？</h3>
+      <p class="muted" style="margin-top:4px" data-end-sub></p>
+      <div class="en-note" data-end-note hidden></div>
+      <div class="stack">
+        <button class="opt" data-act="reconnect" data-end-reconnect hidden><b>重新連線</b><span>回到同一位協助者（Demo 模擬）</span></button>
+        <button class="opt primary" data-act="continueSearch"><b>繼續尋找協助者</b><span>保留事件簡述，模擬通知下一位協助者。位置要重新授權。</span></button>
+        <button class="opt safe" data-act="resolve"><b>我已安全，結束求助</b><span>將這筆求助標記為完成，並停止分享位置</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" data-sheet="emergency" role="dialog" aria-labelledby="em-${d}" aria-modal="true">
+    <button class="grip" data-grip aria-label="關閉"></button>
+    <div class="sheet-body">
+      <h3 id="em-${d}" style="font-size:20px;font-weight:700" data-em-title></h3>
+      <p class="muted" style="margin-top:6px" data-em-sub></p>
+      <div class="stack">
+        <button class="btn danger" data-act="simDial" data-em-go></button>
+        <button class="btn line" data-act="closeEmergency">關閉</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" data-sheet="info" role="dialog" aria-labelledby="inf-${d}" aria-modal="true">
+    <button class="grip" data-grip aria-label="關閉"></button>
+    <div class="sheet-head" style="padding:0 20px 8px"><h3 id="inf-${d}" data-info-title></h3><button class="x" data-act="closeInfo" aria-label="關閉">${icon('x')}</button></div>
+    <div class="sheet-body" data-info-body></div>
+  </section>
+
+  <div class="profile" data-profile role="dialog" aria-label="個人資訊與設定">
+    <div class="pf-head"><button class="back" data-act="closeProfile" aria-label="返回">${icon('back')}</button><h2>個人資訊</h2></div>
+    <div class="pf-body">
+      <div class="pf-card" data-pf-view>
+        <div class="pic"><span class="avatar" data-pf-avatar></span></div>
+        <div style="min-width:0;flex:1"><b data-pf-name></b><p data-pf-bio></p></div>
+      </div>
+      <button class="btn line" data-act="editProfile" data-pf-edit style="min-height:44px;font-size:15px">編輯資料</button>
+      <div data-pf-form hidden>
+        <label class="field"><span>顯示名稱</span><input data-f-name maxlength="20" autocomplete="off"></label>
+        <p class="field-err" data-f-err></p>
+        <label class="field" style="margin-top:4px"><span>個人簡介</span><textarea data-f-bio rows="2" maxlength="80"></textarea></label>
+        <div class="field"><span>頭像顏色</span><div class="swatches" data-f-sw>${COLORS.map(c=>`<button class="sw" style="background:${c}" data-act="pickColor" data-arg="${c}" aria-label="頭像顏色 ${c}" aria-pressed="false"></button>`).join('')}</div></div>
+        <div class="tool-row" style="margin-top:16px;display:flex;gap:8px"><button class="btn line" data-act="cancelEdit" style="min-height:44px;font-size:15px">取消</button><button class="btn solid" data-act="saveProfile" style="min-height:44px;font-size:15px">儲存</button></div>
+      </div>
+      <p class="group-t">通知</p>
+      <div class="group">
+        <div class="row"><span>接收附近求助<small data-notify-status></small></span><button class="switch" role="switch" data-act="toggleSetting" data-arg="notify" aria-label="接收附近求助"></button></div>
+        <div class="row"><span>聲音</span><button class="switch" role="switch" data-act="toggleSetting" data-arg="sound" aria-label="聲音"></button></div>
+        <div class="row"><span>震動<small>此裝置支援時才會震動</small></span><button class="switch" role="switch" data-act="toggleSetting" data-arg="vibrate" aria-label="震動"></button></div>
+      </div>
+      <p class="group-t">基本設定</p>
+      <div class="group">
+        <div class="row"><span>位置權限<small>Demo 模擬，不會讀取真實 GPS</small></span><button class="switch" role="switch" data-act="toggleSetting" data-arg="locationPerm" aria-label="位置權限"></button></div>
+        <button class="row" data-act="openInfo" data-arg="privacy"><span>隱私說明</span><span class="val">${icon('next')}</span></button>
+        <button class="row" data-act="openInfo" data-arg="about"><span>關於 SafeRadius</span><span class="val">Demo ${icon('next')}</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" data-toast role="status" aria-live="polite"></div>
+  <div class="homebar" aria-hidden="true"></div>`;
+}
+
+const INFO = {
+  privacy:{ t:'隱私說明', b:`<p>收到求助的人只會看到隱私保護稱呼、你寫的事件簡述與概略位置。</p><p>精確位置預設不分享。只有在通話接通後由你主動分享，對方才看得到，也可以隨時停止。</p><p>改為尋找下一位協助者時，位置會停止分享，先前的訊息也不會提供給新的協助者。</p><p class="muted">這是 Demo：資料只存在這個瀏覽器分頁，不上傳，不使用真實定位，也沒有連接任何真實服務。</p>` },
+  about:{ t:'關於 SafeRadius', b:`<p>SafeRadius 讓遇到危險的人，能立即用語音聯絡附近願意幫忙的人。每個人都可以是求助者，也可以是協助者。</p><p class="muted">目前是展示用原型。語音、通知、配對、定位與導航都是模擬，沒有連接真實服務，也沒有連接警消系統。緊急情況請直接撥打 110 或 119。</p>` },
+};
+
+/* ========== 建立畫面 ========== */
+const stage=document.getElementById('stage');
+const phones={};
+DEVICES.forEach(d=>{
+  const el=document.createElement('section'); el.className='phone'; el.dataset.device=d;
+  el.setAttribute('aria-label',d==='me'?'手機畫面':'對方手機畫面');
+  el.innerHTML=phoneHTML(d); stage.appendChild(el); phones[d]=el;
+  // 不支援 overflow:clip 的瀏覽器，焦點可能把外框捲走，一律拉回原位
+  el.addEventListener('scroll',()=>{ el.scrollTop=0; el.scrollLeft=0; });
+});
+const panel=document.createElement('aside'); panel.className='panel'; panel.id='panel'; panel.setAttribute('aria-label','Demo 控制');
+panel.innerHTML=`
+  <div class="panel-head"><h3>Demo 控制<small>展示用，不屬於產品功能</small></h3><button class="x panel-close" data-p="closePanel" aria-label="關閉 Demo 控制">${icon('x')}</button></div>
+  <div class="panel-body">
+    <div class="panel-state"><span>狀態</span><code data-p-state>idle</code></div>
+    <p class="p-t">切換視角</p>
+    <div class="seg"><button data-p="viewRequester" data-p-vr>求助者</button><button data-p="viewHelper" data-p-vh>協助者</button></div>
+    <p class="p-t">情境</p>
+    <div class="p-grid">
+      <button class="p-btn wide" data-p="simIncoming">模擬附近有人求助</button>
+      <button class="p-btn" data-p="accept" data-pb-accept>模擬協助者接聽</button>
+      <button class="p-btn" data-p="msg" data-pb-msg>模擬對方傳送訊息</button>
+      <button class="p-btn" data-p="share" data-pb-share>模擬分享位置</button>
+      <button class="p-btn" data-p="offer" data-pb-offer>模擬願意前往</button>
+      <button class="p-btn" data-p="start" data-pb-start>模擬開始前往</button>
+      <button class="p-btn" data-p="arrive" data-pb-arrive>模擬抵達</button>
+      <button class="p-btn wide" data-p="drop" data-pb-drop>模擬通話意外中斷</button>
+    </div>
+    <p class="p-hint" data-p-hint hidden></p>
+    <p class="p-t">展示方式</p>
+    <div class="p-row"><span>自動模擬對方<small>對方會自己接聽、回訊息與前往</small></span><button class="switch" role="switch" data-p="toggleAuto" data-p-auto aria-label="自動模擬對方"></button></div>
+    <div class="p-row dual-row"><span>並排兩支手機<small>投影時最清楚，兩邊都由你操作</small></span><button class="switch" role="switch" data-p="toggleDual" data-p-dual aria-label="並排兩支手機"></button></div>
+    <div class="p-grid" style="margin-top:8px">
+      <button class="p-btn" data-p="home">返回首頁</button>
+      <button class="p-btn warn" data-p="reset">重設整個 Demo</button>
+    </div>
+    <p class="p-hint">所有對方、定位、通話與導航都是模擬，沒有連接真實服務。</p>
+  </div>`;
+stage.appendChild(panel);
+
+/* ========== 把狀態畫到畫面上（不重建 DOM，輸入框與動畫才不會中斷） ========== */
+const q=(root,sel)=>root.querySelector(sel);
+function setT(el,t){ if(el&&el.textContent!==t) el.textContent=t; }
+function setAvatar(el,name,color){ setT(el,[...name][0]||'？'); el.style.background=color; }
+function syncSheet(root,name,open){
+  const el=q(root,`[data-sheet="${name}"]`); el.classList.toggle('open',open); el.inert=!open;
+  if(!open){ el.style.transform=''; }
+}
+function renderMain(d,root,view){
+  const r=roleOf(d); const row=q(root,'[data-row-main]'); const hint=q(root,'[data-go-hint]');
+  const ended=S.call.status==='ended'; const h=S.help.status;
+  let key,html='',ht='';
+  if(ended){ key='ended'; }
+  else if(r==='requester'){
+    key='req'+S.location.shared;
+    if(!S.location.shared) html=`<button class="btn ok" data-act="share">${icon('pin')}分享我的位置</button>`;
+  } else if(h==='none'){ key='h0'; html=`<button class="btn ok" data-act="offer">我願意前往協助</button>`; }
+  else if(h==='offered'){ key='h1'+S.location.shared;
+    html=`<button class="btn ok" data-act="start" ${S.location.shared?'':'disabled'}>確認開始前往</button><button class="btn quiet" data-act="cancelGo" style="flex:none;width:112px">先不前往</button>`;
+    if(!S.location.shared) ht='等對方分享位置後，才能開始前往';
+  } else if(h==='enRoute'){ key='h2'; html=`<button class="btn ok" data-act="arrive">回報已抵達</button><button class="btn quiet" data-act="cancelGo" style="flex:none;width:112px">取消前往</button>`; }
+  else { key='h3'; }
+  if(row.dataset.k!==key){ row.dataset.k=key; row.innerHTML=html; }
+  row.hidden=!html; setT(hint,ht); hint.hidden=!ht;
+  q(root,'[data-loc-line]').hidden=!(r==='requester'&&S.location.shared&&!ended);
+}
+function renderChat(d,root,r){
+  const list=q(root,'[data-chat-list]'); const msgs=S.chat.messages;
+  const first=list.firstElementChild; const firstId=first&&first.dataset.id?+first.dataset.id:null;
+  if(!msgs.length || (firstId&&firstId!==msgs[0].id) || (list.dataset.role&&list.dataset.role!==r)){
+    list.replaceChildren();
+  }
+  list.dataset.role=r||'';
+  if(!msgs.length){ const e=document.createElement('p'); e.className='chat-empty'; e.textContent='通話中也可以傳文字。\n說不出話時，打字一樣能讓對方知道情況。'; e.style.whiteSpace='pre-line'; list.append(e); return; }
+  list.querySelector('.chat-empty')?.remove();
+  let added=false;
+  const have=list.querySelectorAll('.msg').length;
+  msgs.slice(have).forEach(m=>{
+    const w=document.createElement('div');
+    w.className='msg '+(m.from==='system'?'sys':(m.from===r?'mine':'them')); w.dataset.id=m.id;
+    const b=document.createElement('div'); b.className='b'; b.textContent=m.text; w.append(b);
+    if(m.from!=='system'){ const t=document.createElement('time'); t.textContent=m.at; w.append(t); }
+    list.append(w); added=true;
+  });
+  if(added) requestAnimationFrame(()=>{ list.scrollTop=list.scrollHeight; });
+}
+function renderMap(d,root,r){
+  const sh=S.location.shared, h=S.help.status;
+  const req=q(root,'[data-m-req]'), hp=q(root,'[data-m-help]'), rt=q(root,'[data-route]'), rb=q(root,'[data-route-bg]'), ap=q(root,'[data-approx]');
+  const going=h==='enRoute'||h==='arrived';
+  const showReq = r==='requester' || sh;              // 未授權時，協助者看不到精確位置
+  const showHelp = r==='helper' || going;             // 協助者要開始前往，求助者才看得到對方
+  const showRoute = sh && (going || (r==='helper'&&h==='offered'));
+  req.style.display=showReq?'':'none';
+  hp.style.display=showHelp?'':'none';
+  rt.style.display=rb.style.display=showRoute?'':'none';
+  ap.style.display=(r==='helper'&&!sh)?'':'none';
+  const len=rt.getTotalLength?rt.getTotalLength():0;
+  const p=S.help.progress;
+  if(len){
+    rt.style.strokeDasharray=`${len} ${len}`; rt.style.strokeDashoffset=`${-p*len}`;
+    const pt=rt.getPointAtLength(p*len); hp.setAttribute('transform',`translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
+  }
+  const remain=Math.round(ROUTE_M*(1-p)/10)*10, mins=Math.max(1,Math.ceil(ROUTE_MIN*(1-p)));
+  let title,dist='',note='';
+  if(r==='requester'){
+    title=sh?'位置已分享給協助者':'你的位置尚未分享';
+    note=sh?'只有這次接通的協助者看得到，隨時可以停止。':'目前只有你看得到。要不要分享由你決定。';
+    if(h==='enRoute'){ dist=`Demo 模擬：剩約 ${remain} 公尺`; note=`${helperName()} 正在前往，約 ${mins} 分鐘（Demo 模擬）。`; }
+    if(h==='arrived'){ title='協助者已抵達'; note=`${helperName()} 回報已抵達（Demo 模擬）。`; }
+  } else {
+    if(!sh){ title='對方尚未分享精確位置'; note='目前只顯示約略範圍。對方分享後才會出現位置與路線。'; }
+    else if(h==='enRoute'){ title='導航中'; dist=`Demo 模擬：剩約 ${remain} 公尺`; note=`步行約 ${mins} 分鐘（Demo 模擬，非真實導航）。`; }
+    else if(h==='arrived'){ title='你已回報抵達'; note='請留意周遭，並持續與對方確認情況。'; }
+    else { title='求助者的位置'; dist=`Demo 模擬：約 ${ROUTE_M} 公尺`; note=h==='offered'?'確認出發後，對方會看到你正在前往。':'願意前往後才能開始導航。只陪通話也是協助。'; }
+  }
+  setT(q(root,'[data-map-title]'),title); setT(q(root,'[data-map-dist]'),dist); setT(q(root,'[data-map-note]'),note);
+  const box=q(root,'[data-map-actions]'); let key,html='';
+  const ended=S.call.status==='ended';
+  if(r==='requester'){
+    key='r'+sh+ended;
+    if(!ended) html= sh?`<button class="btn line" data-act="stopShare">停止分享</button>`:`<button class="btn ok" data-act="share">${icon('pin')}分享我的位置</button>`;
+  } else {
+    key='h'+h+sh+ended;
+    if(h==='none'&&!ended) html=`<button class="btn ok" data-act="offer">我願意前往協助</button>`;
+    if(h==='offered') html=`<button class="btn ok" data-act="start" ${sh?'':'disabled'}>${sh?'確認開始前往':'等對方分享位置'}</button>`;
+    if(h==='enRoute') html=`<button class="btn ok" data-act="arrive">回報已抵達</button>`;
+  }
+  if(box.dataset.k!==key){ box.dataset.k=key; box.innerHTML=html; }
+  box.hidden=!html;
+}
+function syncPhone(d){
+  const root=phones[d], ui=S.ui[d], view=viewOf(d), r=roleOf(d), e=S.event, P=S.profile;
+  root.toggleAttribute('data-off',!S.demo.dual&&d!==S.demo.view);
+  root.dataset.view=view; root.dataset.state=machine(d); root.dataset.role=r||'none';
+  root.toggleAttribute('data-dark',['incoming','connecting','call','helperEnded'].includes(view)&&!ui.profile);
+  root.querySelectorAll('.screen').forEach(s=>{ const on=s.dataset.screen===view; if(s.classList.contains('active')!==on) s.classList.toggle('active',on); s.inert=!on||ui.profile; });
+
+  // 首頁
+  const myName=d==='me'?P.name:PERSONA.helpers[0];
+  setAvatar(q(root,'[data-my-avatar]'),myName,d==='me'?P.color:'#3A5F78');
+  const notifyOn=d==='me'?P.notify:true;
+  q(root,'[data-notify-dot]').classList.toggle('off',!notifyOn);
+  setT(q(root,'[data-notify-line]'),notifyOn?'正在接收附近求助（Demo）':'未接收附近求助');
+  q(root,'[data-notify-pill-dot]').classList.toggle('off',!notifyOn);
+  q(root,'[data-notify-card]').hidden=d!=='me';
+  q(root,'[data-home-notify]').setAttribute('aria-checked',!!P.notify);
+  const locOn=d==='me'?P.locationPerm:true;
+  q(root,'[data-loc-dot]').classList.toggle('off',!locOn);
+  setT(q(root,'[data-loc-text]'),locOn?'位置服務：模擬中':'位置權限：未開啟');
+  const dr=q(root,'[data-draft]'); if(dr.value!==ui.draft) { dr.value=ui.draft; autoGrow(dr); }
+  const cnt=q(root,'[data-count]'); cnt.hidden=ui.draft.length<80; setT(cnt,`${ui.draft.length}/120`);
+  const tl=q(root,'[data-tap-label]'); tl.classList.toggle('armed',ui.tapArmed);
+  setT(tl,ui.tapArmed?'再按一次，立即發送求助':'無法長按？改用連按兩次發送');
+
+  if(e){
+    // 等待
+    const ringing=e.ringing&&!e.helperLeft;
+    setT(q(root,'[data-search-title]'),e.waitingLong?'目前還沒有人接聽':'正在尋找附近協助者');
+    setT(q(root,'[data-search-sub]'),e.waitingLong?'你的求助仍在等待。情況緊急請直接撥打 110 或 119。':'你的求助已送出，正在等待有人接聽');
+    let st= e.phase==='searchingAgain'?'先前的事件簡述已保留，正在模擬通知下一位協助者':'正在模擬通知附近願意協助的人';
+    if(ringing) st=`已模擬通知一位協助者，等待接聽`;
+    if(e.prevEnRoute) st+=`\n${e.prevEnRoute} 先前已標記前往中（Demo 模擬）`;
+    const ss=q(root,'[data-search-status]'); ss.style.whiteSpace='pre-line'; setT(ss,st);
+    const sent=q(root,'[data-sent]'); sent.hidden=!e.brief; setT(q(root,'[data-sent-text]'),e.brief);
+    // 來電
+    const rn=requesterName();
+    setAvatar(q(root,'[data-inc-avatar]'),maskName(rn),colorOf(rn));
+    setT(q(root,'[data-inc-name]'),maskName(rn));
+    setT(q(root,'[data-inc-brief]'),e.brief||'對方沒有留下文字說明');
+    setT(q(root,'[data-persona-note]'),(helpDev()==='peer'||e.candidateIdx>0)?`Demo：這支手機模擬協助者「${helperName()}」`:'');
+    // 接通
+    const peerName=r==='requester'?helperName():rn;
+    setT(q(root,'[data-conn-title]'),S.call.endReason==='dropped'?'重新連線中':`已與 ${peerName} 接通`);
+    // 通話
+    setAvatar(q(root,'[data-call-avatar]'),peerName,colorOf(peerName));
+    setT(q(root,'[data-call-name]'),peerName);
+    const ended=S.call.status==='ended';
+    q(root,'[data-screen="call"]').classList.toggle('ended',ended);
+    setT(q(root,'[data-conn-state]'),ended?'語音已中斷 · Demo 模擬':'語音連線中 · Demo 模擬');
+    q(root,'[data-chip110]').hidden=r!=='requester';
+    const stat=statusFor(r||'requester'), hs=q(root,'[data-help-status]');
+    setT(hs,stat.t); hs.className='help-status '+stat.c;
+    const cb=q(root,'[data-call-brief]'); cb.hidden=!e.brief; cb.classList.toggle('open',ui.briefOpen);
+    setT(q(root,'[data-call-brief-text]'),e.brief);
+    renderMain(d,root,view);
+    q(root,'[data-call-tools]').style.visibility=ended?'hidden':'';
+    if(r){
+      const m=S.call.mute[r], sp=S.call.speaker[r];
+      const cm=q(root,'[data-ctl-mute]'); cm.setAttribute('aria-pressed',m); setT(q(root,'[data-mute-t]'),m?'已靜音':'靜音');
+      const ic=q(root,'[data-mute-ic]'); const want=m?'mic-off':'mic'; if(ic.dataset.k!==want){ ic.dataset.k=want; ic.innerHTML=icon(want); }
+      const cs=q(root,'[data-ctl-spk]'); cs.setAttribute('aria-pressed',sp);
+      root.querySelectorAll('[data-mini-mute]').forEach(b=>{ b.setAttribute('aria-pressed',m); b.setAttribute('aria-label',m?'取消靜音':'靜音'); });
+      ['[data-ctl-mute]','[data-ctl-spk]','[data-ctl-chat]','[data-ctl-hang]'].forEach(s=>q(root,s).disabled=ended);
+      const un=S.chat.unread[r], bd=q(root,'[data-badge]'); bd.hidden=!un; setT(bd,String(un));
+      renderChat(d,root,r);
+      renderMap(d,root,r);
+    }
+    // 協助者掛斷後
+    if(view==='helperEnded'){
+      const why=S.call.endReason, h=S.help.status;
+      setT(q(root,'[data-he-title]'),why==='dropped'?'通話意外中斷':(why==='helper'?'你已結束通話':'對方結束了通話'));
+      setT(q(root,'[data-he-sub]'),why==='dropped'?'這不代表對方已經安全，求助事件仍在進行。':'求助事件仍由對方決定，不會因為通話結束就標記完成。');
+      const undecided=(h==='offered'||h==='enRoute')&&!S.help.decided;
+      q(root,'[data-he-ask]').hidden=!undecided;
+      const box=q(root,'[data-he-acts]'); let k=why+h+undecided+S.location.shared, html='';
+      if(why==='dropped') html+=`<button class="btn ok" data-act="reconnect">重新連線</button>`;
+      if(undecided) html+=`<button class="btn ok" data-act="keepGoing">繼續前往</button><button class="btn quiet" data-act="cancelGo">取消前往承諾</button>`;
+      else {
+        if(h==='enRoute') html+=`<button class="btn ok" data-act="arrive">回報已抵達</button><button class="btn quiet" data-act="openMap">位置與導航</button><button class="btn quiet" data-act="cancelGo">取消前往</button>`;
+        if(h==='offered'&&S.location.shared) html+=`<button class="btn ok" data-act="start">確認開始前往</button>`;
+        html+=`<button class="btn ${h==='enRoute'?'ghost':'quiet'}" data-act="finishHelper">完成本次通話</button>`;
+      }
+      if(box.dataset.k!==k){ box.dataset.k=k; box.innerHTML=html; }
+    }
+    // 結束
+    if(view==='resolved'&&e.summary){
+      setT(q(root,'[data-res-title]'),r==='requester'?'已結束求助':'對方已確認安全');
+      setT(q(root,'[data-res-sub]'),r==='requester'?'你已確認安全，位置也已停止分享。':'這筆求助已結束，謝謝你的協助。'+(e.summary.wasGoing?' 不需要再前往。':''));
+      const sum=q(root,'[data-res-sum]');
+      const k=e.summary.dur+e.summary.msgs;
+      if(sum.dataset.k!==k){ sum.dataset.k=k; sum.innerHTML=`<div><span>通話時間</span><span>${e.summary.dur}</span></div><div><span>文字訊息</span><span>${e.summary.msgs} 則</span></div><div><span>資料</span><span>全部為 Demo 模擬</span></div>`; }
+    }
+    // 迷你通話列
+    if(r){ const who=`${peerName}<span>`; root.querySelectorAll('[data-mini-who]').forEach(w=>{ const nm=w.firstChild; if(!nm||nm.nodeType!==3||nm.data!==peerName){ w.textContent=peerName; const t=document.createElement('span'); t.dataset.timer=''; w.append(t); } }); void who; }
+  }
+
+  root.querySelectorAll('.mini-btn[data-act="toggleMute"],.mini-btn[data-act="hangup"]').forEach(b=>{ b.hidden=S.call.status!=='active'; });
+
+  // 抽屜
+  const inCallView=view==='call'||view==='helperEnded';
+  const sheet=inCallView?ui.sheet:null;
+  const endOpen=view==='call'&&S.call.status==='ended'&&r==='requester';
+  if(endOpen){
+    const why=S.call.endReason;
+    setT(q(root,'[data-end-title]'),why==='dropped'?'通話意外中斷':'你還需要幫助嗎？');
+    setT(q(root,'[data-end-sub]'),why==='dropped'?'求助事件沒有結束。你可以重新連線，或改找下一位。':(why==='helper'?`${helperName()} 結束了通話，你的求助事件仍然有效。`:'通話已結束，你的求助事件仍然有效。'));
+    q(root,'[data-end-reconnect]').hidden=why!=='dropped';
+    const nt=q(root,'[data-end-note]'), h=S.help.status;
+    const msg=h==='enRoute'?`${helperName()} 仍標記為前往中（Demo 模擬）`:h==='arrived'?`${helperName()} 已回報抵達（Demo 模擬）`:h==='offered'?`${helperName()} 先前表示願意前往，尚未出發（Demo 模擬）`:'';
+    nt.hidden=!msg; setT(nt,msg);
+  }
+  const em=ui.emergency;
+  if(em){
+    const label=em==='110'?'110 警察':'119 消防救護';
+    setT(q(root,'[data-em-title]'),ui.simDial?`模擬撥打 ${label} 中`:`撥打 ${label}？`);
+    setT(q(root,'[data-em-sub]'),ui.simDial?'這是 Demo，沒有撥出任何電話。實際發生緊急情況時，請直接用手機撥號。':'這是 Demo，按下不會真的撥號。實際發生緊急情況時，請直接用手機撥號。');
+    const go=q(root,'[data-em-go]'); go.hidden=ui.simDial; setT(go,`模擬撥打 ${em}（不會撥出）`);
+  }
+  if(ui.info){ setT(q(root,'[data-info-title]'),INFO[ui.info].t); const b=q(root,'[data-info-body]'); if(b.dataset.k!==ui.info){ b.dataset.k=ui.info; b.innerHTML=INFO[ui.info].b; } }
+  syncSheet(root,'chat',sheet==='chat');
+  syncSheet(root,'map',sheet==='map');
+  syncSheet(root,'end',endOpen&&!em);
+  syncSheet(root,'emergency',!!em);
+  syncSheet(root,'info',!!ui.info);
+  const scrim=q(root,'[data-scrim]'); scrim.classList.toggle('on',!!(sheet||endOpen||em||ui.info)); scrim.classList.toggle('over',!!ui.info);
+
+  // 個人設定（只有「我」這支手機）
+  const pf=q(root,'[data-profile]'); pf.classList.toggle('open',ui.profile); pf.inert=!ui.profile;
+  if(ui.profile){
+    setAvatar(q(root,'[data-pf-avatar]'),ui.editing?(ui.formName||P.name):P.name,ui.editing?ui.formColor:P.color);
+    setT(q(root,'[data-pf-name]'),P.name); setT(q(root,'[data-pf-bio]'),P.bio||'尚未填寫簡介');
+    q(root,'[data-pf-form]').hidden=!ui.editing; q(root,'[data-pf-edit]').hidden=ui.editing;
+    root.querySelectorAll('[data-f-sw] .sw').forEach(s=>s.setAttribute('aria-pressed',s.dataset.arg===ui.formColor));
+    root.querySelectorAll('[data-arg="notify"],[data-arg="sound"],[data-arg="vibrate"],[data-arg="locationPerm"]').forEach(b=>b.setAttribute('aria-checked',!!P[b.dataset.arg]));
+    setT(q(root,'[data-notify-status]'),P.notify?'已開啟，附近有人求助時會收到來電（Demo）':'已關閉，不會收到附近求助');
+  }
+}
+function syncPanel(){
+  const p=panel, e=S.event, v=S.demo.view;
+  p.toggleAttribute('data-closed',!S.demo.panelOpen);
+  document.getElementById('handle').toggleAttribute('data-open',S.demo.panelOpen);
+  setT(q(p,'[data-p-state]'),machine(S.demo.dual&&e?reqDev():v));
+  const vr=q(p,'[data-p-vr]'), vh=q(p,'[data-p-vh]'); const can=!!e&&!S.demo.dual;
+  vr.disabled=vh.disabled=!can;
+  vr.setAttribute('aria-pressed',!!e&&roleOf(v)==='requester'&&!S.demo.dual); vh.setAttribute('aria-pressed',!!e&&roleOf(v)==='helper'&&!S.demo.dual);
+  const ph=e&&e.phase, inCall=ph==='inCall', h=S.help.status;
+  const dis=(sel,off)=>{ q(p,sel).disabled=!!off; };
+  dis('[data-pb-accept]',!(e&&/searching/.test(ph)));
+  dis('[data-pb-msg]',!inCall);
+  dis('[data-pb-share]',!inCall||S.location.shared);
+  dis('[data-pb-offer]',!inCall||h!=='none');
+  dis('[data-pb-start]',!(h==='offered'&&S.location.shared));
+  dis('[data-pb-arrive]',h!=='enRoute');
+  dis('[data-pb-drop]',!inCall);
+  const hint=q(p,'[data-p-hint]'); const need=inCall&&h==='offered'&&!S.location.shared;
+  hint.hidden=!need; setT(hint,'求助者分享位置後，才能開始前往。');
+  q(p,'[data-p-auto]').setAttribute('aria-checked',S.demo.auto&&!S.demo.dual); q(p,'[data-p-auto]').disabled=S.demo.dual;
+  q(p,'[data-p-dual]').setAttribute('aria-checked',S.demo.dual);
+}
+function sync(){
+  DEVICES.forEach(syncPhone); syncPanel(); syncRing();
+  const t=fmt(callSeconds()); document.querySelectorAll('[data-timer]').forEach(el=>setT(el,t));
+}
+setInterval(()=>{ if(S.call.status==='active'){ const t=fmt(callSeconds()); document.querySelectorAll('[data-timer]').forEach(el=>setT(el,t)); } },1000);
+
+function autoGrow(t){ t.style.height='auto'; if(t.scrollHeight) t.style.height=t.scrollHeight+'px'; }
+
+/* ========== 互動 ========== */
+const uiAct={
+  openProfile(d){ if(d!=='me'){ toast(d,'這是展示用的對方手機，個人設定在主要手機。'); return; } S.ui.me.profile=true; },
+  closeProfile(d){ S.ui[d].profile=false; S.ui[d].editing=false; },
+  editProfile(d){ const u=S.ui[d]; u.editing=true; u.formColor=S.profile.color; u.formName=S.profile.name; const r=phones[d]; q(r,'[data-f-name]').value=S.profile.name; q(r,'[data-f-bio]').value=S.profile.bio; setT(q(r,'[data-f-err]'),''); },
+  cancelEdit(d){ S.ui[d].editing=false; },
+  pickColor(d,a){ S.ui[d].formColor=a; },
+  saveProfile(d){
+    const r=phones[d], n=q(r,'[data-f-name]').value.trim();
+    if(!n){ setT(q(r,'[data-f-err]'),'請輸入顯示名稱'); q(r,'[data-f-name]').focus(); return; }
+    S.profile.name=n; S.profile.bio=q(r,'[data-f-bio]').value.trim(); S.profile.color=S.ui[d].formColor; S.ui[d].editing=false; toast(d,'已更新個人資料');
+  },
+  toggleSetting(d,a){ S.profile[a]=!S.profile[a]; },
+  openInfo(d,a){ S.ui[d].info=a; },
+  closeInfo(d){ S.ui[d].info=null; },
+  emergency(d,a){ S.ui[d].emergency=a; S.ui[d].simDial=false; },
+  simDial(d){ S.ui[d].simDial=true; },
+  closeEmergency(d){ S.ui[d].emergency=null; S.ui[d].simDial=false; },
+  tapSos(d){
+    const u=S.ui[d];
+    if(u.tapArmed){ u.tapArmed=false; cancel('tap'+d); act.sendSOS(d,u.draft); return; }
+    u.tapArmed=true; later('tap'+d,5000,()=>{ u.tapArmed=false; });
+  },
+  cancelSearch(){ act.cancelSearch(); },
+  accept(){ act.accept(); }, skip(){ act.skip(); },
+  hangup(d){ act.hangup(d); },
+  reconnect(){ act.reconnect(); }, continueSearch(){ act.continueSearch(); }, resolve(){ act.resolve(); },
+  ack(d){ act.ack(d); }, finishHelper(d){ act.finishHelper(d); },
+  offer(){ act.offer(); }, start(){ act.start(); }, arrive(){ act.arrive(); }, cancelGo(){ act.cancelGo(); }, keepGoing(){ act.keepGoing(); },
+  share(d){ act.share(d); }, stopShare(){ act.stopShare(); },
+  toggleMute(d){ const r=roleOf(d); S.call.mute[r]=!S.call.mute[r]; },
+  toggleSpeaker(d){ const r=roleOf(d); S.call.speaker[r]=!S.call.speaker[r]; },
+  toggleBrief(d){ S.ui[d].briefOpen=!S.ui[d].briefOpen; },
+  openChat(d){ S.ui[d].sheet='chat'; S.chat.unread[roleOf(d)]=0; requestAnimationFrame(()=>{ const l=q(phones[d],'[data-chat-list]'); l.scrollTop=l.scrollHeight; }); },
+  openMap(d){ S.ui[d].sheet='map'; },
+  closeSheet(d){ S.ui[d].sheet=null; },
+  scrim(d){ const u=S.ui[d]; if(u.emergency){ u.emergency=null; u.simDial=false; } else if(u.info){ u.info=null; } else if(u.sheet){ u.sheet=null; } },
+  send(d){ sendChat(d); },
+};
+function sendChat(d){
+  const t=q(phones[d],'[data-chat-input]'); const r=roleOf(d);
+  if(act.send(r,t.value)){ t.value=''; autoGrow(t); q(phones[d],'[data-send]').disabled=true; }
+}
+document.addEventListener('pointerdown',unlockAudio,{capture:true});
+stage.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
+  const ph=b.closest('.phone'); if(!ph) return;
+  const fn=uiAct[b.dataset.act]; if(fn){ fn(ph.dataset.device,b.dataset.arg); sync(); }
+});
+stage.addEventListener('input',ev=>{
+  const t=ev.target, ph=t.closest('.phone'); if(!ph) return; const d=ph.dataset.device;
+  if(t.matches('[data-draft]')){ S.ui[d].draft=t.value; autoGrow(t); syncPhone(d); }
+  if(t.matches('[data-chat-input]')){ autoGrow(t); q(ph,'[data-send]').disabled=!t.value.trim(); }
+  if(t.matches('[data-f-name]')){ S.ui[d].formName=t.value.trim(); syncPhone(d); }
+});
+stage.addEventListener('keydown',ev=>{
+  if(ev.target.matches('[data-chat-input]')&&ev.key==='Enter'&&!ev.shiftKey&&!ev.isComposing&&ev.keyCode!==229){ ev.preventDefault(); sendChat(ev.target.closest('.phone').dataset.device); sync(); }
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key!=='Escape') return;
+  DEVICES.forEach(d=>{ const u=S.ui[d]; if(u.emergency){u.emergency=null;} else if(u.info){u.info=null;} else if(u.sheet){u.sheet=null;} else if(u.profile&&!u.editing){u.profile=false;} });
+  if(window.innerWidth<=1000) S.demo.panelOpen=false;
+  sync();
+});
+
+/* 長按 SOS：真的偵測按住，放開就取消 */
+function bindSOS(d){
+  const root=phones[d], btn=q(root,'[data-sos]'), prog=q(root,'.sos-ring .prog'), hint=q(root,'[data-hold-hint]');
+  let raf=0,t0=0,active=false,fired=false;
+  const frame=now=>{
+    if(!active) return;
+    const p=Math.min(1,(now-t0)/HOLD_MS);
+    prog.style.strokeDashoffset=String(100-100*p);
+    if(p>=1){ finish(); return; }
+    raf=requestAnimationFrame(frame);
+  };
+  const begin=()=>{
+    if(active||fired||viewOf(d)!=='home') return;
+    active=true; S.ui[d].holding=true; root.classList.add('holding'); t0=performance.now();
+    setT(hint,'繼續按住，放開可取消'); buzz(15);
+    root.dataset.state=machine(d); syncPanel();
+    raf=requestAnimationFrame(frame);
+  };
+  const end=(cancelled)=>{
+    if(!active) return;
+    active=false; cancelAnimationFrame(raf); S.ui[d].holding=false; root.classList.remove('holding');
+    prog.style.strokeDashoffset='100';
+    if(cancelled){ setT(hint,'已取消，沒有發送'); clearTimeout(btn._h); btn._h=setTimeout(()=>setT(hint,'長按 2 秒，發出求助'),1600); root.dataset.state=machine(d); syncPanel(); }
+  };
+  const finish=()=>{
+    end(false); fired=true; root.classList.add('fired');
+    setT(hint,'長按 2 秒，發出求助');
+    const brief=S.ui[d].draft;
+    setTimeout(()=>{ act.sendSOS(d,brief); sync(); root.classList.remove('fired'); fired=false; },220);
+    buzz([30,40,90]);
+  };
+  btn.addEventListener('pointerdown',ev=>{ if(ev.button!==0&&ev.pointerType==='mouse') return; ev.preventDefault(); try{btn.setPointerCapture(ev.pointerId)}catch(_){} begin(); });
+  btn.addEventListener('pointerup',()=>end(true));
+  btn.addEventListener('pointercancel',()=>end(true));
+  btn.addEventListener('lostpointercapture',()=>end(true));
+  btn.addEventListener('contextmenu',ev=>ev.preventDefault());
+  btn.addEventListener('keydown',ev=>{ if((ev.key===' '||ev.key==='Enter')&&!ev.repeat){ ev.preventDefault(); begin(); } else if(ev.key===' '||ev.key==='Enter') ev.preventDefault(); });
+  btn.addEventListener('keyup',ev=>{ if(ev.key===' '||ev.key==='Enter') end(true); });
+  btn.addEventListener('blur',()=>end(true));
+}
+DEVICES.forEach(bindSOS);
+
+/* 拖曳收合抽屜 */
+stage.addEventListener('pointerdown',ev=>{
+  const g=ev.target.closest('[data-grip]'); if(!g) return;
+  const sh=g.closest('.sheet'), d=g.closest('.phone').dataset.device; const y0=ev.clientY; let dy=0;
+  sh.classList.add('dragging'); g.setPointerCapture(ev.pointerId);
+  const mv=e=>{ dy=Math.max(0,e.clientY-y0); sh.style.transform=`translateY(${dy}px)`; };
+  const up=()=>{ g.removeEventListener('pointermove',mv); g.removeEventListener('pointerup',up); g.removeEventListener('pointercancel',up);
+    sh.classList.remove('dragging'); sh.style.transform='';
+    if(dy>72||dy<3){ const n=sh.dataset.sheet,u=S.ui[d]; if(n==='emergency'){u.emergency=null;u.simDial=false;} else if(n==='info'){u.info=null;} else {u.sheet=null;} sync(); }
+  };
+  g.addEventListener('pointermove',mv); g.addEventListener('pointerup',up); g.addEventListener('pointercancel',up);
+});
+
+/* Demo 控制 */
+function switchView(role){
+  if(!S.event||S.demo.dual) return;
+  const d=devOfRole(role); if(d===S.demo.view) return;
+  S.demo.view=d;
+  if(S.demo.auto){ S.demo.auto=false; cancel('autoAccept','autoOffer','autoStart','autoShare','reply','peerFirst'); toast(d,'切換視角後，雙方都由你操作。可在 Demo 控制重開自動模擬。'); }
+}
+const panelAct={
+  closePanel(){ S.demo.panelOpen=false; },
+  viewRequester(){ switchView('requester'); },
+  viewHelper(){ switchView('helper'); },
+  simIncoming(){ act.simIncoming(); },
+  accept(){ const e=S.event; if(!e) return; if(!e.ringing){ cancel('ring'); e.ringing=true; e.helperLeft=false; } act.accept(); },
+  msg(){ const r=(S.demo.dual||roleOf(S.demo.view)==='requester')?'helper':'requester'; if(S.event&&S.event.phase==='inCall') pushMsg(r,nextLine(r)); },
+  share(){ act.share(reqDev()); },
+  offer(){ act.offer(); }, start(){ act.start(); }, arrive(){ act.arrive(); },
+  drop(){ act.hangup(reqDev(),'dropped'); },
+  toggleAuto(){ S.demo.auto=!S.demo.auto; if(S.demo.auto&&S.event&&S.event.ringing&&isSim('helper')) later('autoAccept',3200,()=>act.accept()); },
+  toggleDual(){ S.demo.dual=!S.demo.dual; if(S.demo.dual) cancel('autoAccept','autoOffer','autoStart','autoShare','reply','peerFirst'); },
+  home(){ cancelAll(); stopProgress(); S.event=null; resetRound(); DEVICES.forEach(d=>{ const u=S.ui[d]; u.sheet=null;u.emergency=null;u.info=null;u.profile=false;u.editing=false; }); S.demo.view='me'; },
+  reset(){
+    cancelAll(); stopProgress(); const po=S.demo.panelOpen,du=S.demo.dual;
+    S=initial(); S.demo.panelOpen=po; S.demo.dual=du;
+    DEVICES.forEach(d=>{ const r=phones[d]; q(r,'[data-chat-input]').value=''; q(r,'[data-chat-list]').replaceChildren(); autoGrow(q(r,'[data-draft]')); });
+    toast('me','Demo 已重設');
+  },
+};
+panel.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-p]'); if(!b||b.disabled) return;
+  const fn=panelAct[b.dataset.p]; if(fn){ fn(); sync(); }
+  if(window.innerWidth<=1000&&!['closePanel','toggleAuto'].includes(b.dataset.p)&&!b.closest('.seg')) { S.demo.panelOpen=false; sync(); }
+  else if(b.closest('.seg')&&window.innerWidth<=1000){ S.demo.panelOpen=false; sync(); }
+});
+document.getElementById('handle').addEventListener('click',()=>{ S.demo.panelOpen=true; sync(); });
+
+/* 手機鍵盤：畫面高度跟著可視區縮小，輸入框才不會被蓋住 */
+if(window.visualViewport){
+  const vv=window.visualViewport;
+  const fit=()=>{ if(window.innerWidth<=520){ document.documentElement.style.setProperty('--app-h',vv.height+'px'); window.scrollTo(0,0); } else { document.documentElement.style.removeProperty('--app-h'); } };
+  vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); fit();
+}
+window.addEventListener('resize',()=>{ if(window.innerWidth>1000&&!S.demo.panelOpen) S.demo.panelOpen=true; if(window.innerWidth<=1000&&S.demo.dual){ S.demo.dual=false; } sync(); });
+
+window.SafeRadiusDemo={ state:()=>S, machine:()=>machine(S.demo.view) };
+sync();
+</script>
+</body>
+</html>
